@@ -159,7 +159,7 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
     <button class="pin-key" onclick="pinPress('7')">7</button>
     <button class="pin-key" onclick="pinPress('8')">8</button>
     <button class="pin-key" onclick="pinPress('9')">9</button>
-    <button class="pin-key empty"></button>
+    <button class="pin-key" onclick="submitPin()">&#10003;</button>
     <button class="pin-key" onclick="pinPress('0')">0</button>
     <button class="pin-key" onclick="pinBackspace()">&#9003;</button>
   </div>
@@ -171,7 +171,7 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
 <!-- STEP 3b: CREATE PIN (new family) -->
 <div class="fullscreen hidden" id="screenNewPin">
   <h1>&#128274;</h1>
-  <h2 id="newPinTitle">Choose a 6-digit PIN</h2>
+  <h2 id="newPinTitle">Choose a PIN (6-10 digits)</h2>
   <div class="pin-dots" id="newPinDots"></div>
   <div class="pin-pad">
     <button class="pin-key" onclick="newPinPress('1')">1</button>
@@ -183,7 +183,7 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
     <button class="pin-key" onclick="newPinPress('7')">7</button>
     <button class="pin-key" onclick="newPinPress('8')">8</button>
     <button class="pin-key" onclick="newPinPress('9')">9</button>
-    <button class="pin-key empty"></button>
+    <button class="pin-key" onclick="submitNewPin()">&#10003;</button>
     <button class="pin-key" onclick="newPinPress('0')">0</button>
     <button class="pin-key" onclick="newPinBackspace()">&#9003;</button>
   </div>
@@ -236,7 +236,7 @@ var firebaseConfig={
 firebase.initializeApp(firebaseConfig);
 var auth=firebase.auth();
 var db=firebase.firestore();
-var PIN_LENGTH=6;
+var MIN_PIN=6;var MAX_PIN=10;
 var familyCode=null;
 var currentPin=null;
 var gUserInfo=null;
@@ -394,11 +394,12 @@ function joinFamily(){
 var pinEntry='';
 
 function goToPinScreen(){pinEntry='';showScreen('screenPin');renderDots('pinDots',pinEntry);document.getElementById('pinError').textContent='';document.getElementById('pinStatus').textContent='';}
-function renderDots(id,val){var h='';for(var i=0;i<PIN_LENGTH;i++)h+='<div class="pin-dot'+(i<val.length?' filled':'')+'"></div>';document.getElementById(id).innerHTML=h;}
-function pinPress(d){if(pinEntry.length>=PIN_LENGTH)return;pinEntry+=d;renderDots('pinDots',pinEntry);if(pinEntry.length===PIN_LENGTH)setTimeout(submitPin,200);}
+function renderDots(id,val){var len=Math.max(val.length,MIN_PIN);var h='';for(var i=0;i<len;i++)h+='<div class="pin-dot'+(i<val.length?' filled':'')+'"></div>';document.getElementById(id).innerHTML=h;}
+function pinPress(d){if(pinEntry.length>=MAX_PIN)return;pinEntry+=d;renderDots('pinDots',pinEntry);}
 function pinBackspace(){if(pinEntry.length>0){pinEntry=pinEntry.slice(0,-1);renderDots('pinDots',pinEntry);}}
 
 function submitPin(){
+  if(pinEntry.length<MIN_PIN){document.getElementById('pinError').textContent='PIN must be at least '+MIN_PIN+' digits';return;}
   document.getElementById('pinError').textContent='';
   document.getElementById('pinStatus').textContent='Decrypting...';
   db.collection('families').doc(familyCode).get().then(function(doc){
@@ -459,11 +460,12 @@ function submitPin(){
 /* ===== PIN: create new family ===== */
 var newPinEntry='',newPinFirst='',newPinPhase='choose';
 
-function goToNewPinScreen(){newPinEntry='';newPinFirst='';newPinPhase='choose';document.getElementById('newPinTitle').textContent='Choose a 6-digit PIN';document.getElementById('newPinError').textContent='';showScreen('screenNewPin');renderDots('newPinDots',newPinEntry);}
-function newPinPress(d){if(newPinEntry.length>=PIN_LENGTH)return;newPinEntry+=d;renderDots('newPinDots',newPinEntry);if(newPinEntry.length===PIN_LENGTH)setTimeout(submitNewPin,200);}
+function goToNewPinScreen(){newPinEntry='';newPinFirst='';newPinPhase='choose';document.getElementById('newPinTitle').textContent='Choose a PIN ('+MIN_PIN+'-'+MAX_PIN+' digits)';document.getElementById('newPinError').textContent='';showScreen('screenNewPin');renderDots('newPinDots',newPinEntry);}
+function newPinPress(d){if(newPinEntry.length>=MAX_PIN)return;newPinEntry+=d;renderDots('newPinDots',newPinEntry);}
 function newPinBackspace(){if(newPinEntry.length>0){newPinEntry=newPinEntry.slice(0,-1);renderDots('newPinDots',newPinEntry);}}
 
 function submitNewPin(){
+  if(newPinEntry.length<MIN_PIN){document.getElementById('newPinError').textContent='PIN must be at least '+MIN_PIN+' digits';return;}
   if(newPinPhase==='choose'){
     newPinFirst=newPinEntry;newPinEntry='';newPinPhase='confirm';
     document.getElementById('newPinTitle').textContent='Confirm PIN';
@@ -473,7 +475,7 @@ function submitNewPin(){
     if(newPinEntry!==newPinFirst){
       document.getElementById('newPinError').textContent="PINs don't match. Try again.";
       newPinEntry='';newPinFirst='';newPinPhase='choose';
-      document.getElementById('newPinTitle').textContent='Choose a 6-digit PIN';
+      document.getElementById('newPinTitle').textContent='Choose a PIN ('+MIN_PIN+'-'+MAX_PIN+' digits)';
       renderDots('newPinDots',newPinEntry);return;
     }
     currentPin=newPinEntry;
@@ -494,7 +496,7 @@ function submitNewPin(){
       unlockApp();
     }).catch(function(err){
       console.error(err);document.getElementById('newPinError').textContent='Failed to create: '+(err.message||'');
-      document.getElementById('newPinTitle').textContent='Choose a 6-digit PIN';
+      document.getElementById('newPinTitle').textContent='Choose a PIN ('+MIN_PIN+'-'+MAX_PIN+' digits)';
       newPinEntry='';newPinFirst='';newPinPhase='choose';renderDots('newPinDots',newPinEntry);currentPin=null;familyCode=null;
     });
   }
