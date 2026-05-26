@@ -856,7 +856,7 @@ function resetFamilyPin(){
   function renderResetUI(){
     var dots='';var len=Math.max(np.length,MIN_PIN);for(var i=0;i<len;i++)dots+='<div class="pin-dot'+(i<np.length?' filled':'')+'"></div>';
     var title=phase==='choose'?'New PIN ('+MIN_PIN+'-'+MAX_PIN+' digits)':'Confirm New PIN';
-    var h='<div class="modal"><button class="modal-close" id="resetPinClose">&times;</button><h2>'+title+'</h2><div class="pin-dots">'+dots+'</div><div class="pin-pad">';
+    var h='<div class="modal" style="background:var(--orange);color:#fff;text-align:center"><button class="modal-close" id="resetPinClose">&times;</button><h2>'+title+'</h2><div class="pin-dots">'+dots+'</div><div class="pin-pad" style="margin:0 auto">';
     var keys=['1','2','3','4','5','6','7','8','9','ok','0','del'];
     for(var i=0;i<keys.length;i++){
       if(keys[i]==='ok')h+='<button class="pin-key" data-action="submit">&#10003;</button>';
