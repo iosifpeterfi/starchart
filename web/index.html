@@ -413,9 +413,10 @@ function submitPin(){
       var uid=auth.currentUser&&auth.currentUser.uid;
       var email=auth.currentUser&&auth.currentUser.email;
       var emailLower=email?email.toLowerCase():'';
+      var emailVerified=auth.currentUser&&auth.currentUser.emailVerified;
       var isMember=uid&&(payload.members||[]).indexOf(uid)!==-1;
-      var isPending=emailLower&&(payload.pendingMembers||[]).indexOf(emailLower)!==-1;
-      var isEmailMember=emailLower&&(payload.memberEmails||[]).indexOf(emailLower)!==-1;
+      var isPending=emailVerified&&emailLower&&(payload.pendingMembers||[]).indexOf(emailLower)!==-1;
+      var isEmailMember=emailVerified&&emailLower&&(payload.memberEmails||[]).indexOf(emailLower)!==-1;
       if(!isMember&&!isPending&&!isEmailMember){
         pinEntry='';renderDots('pinDots',pinEntry);
         document.getElementById('pinError').textContent='Wrong PIN';
@@ -430,10 +431,10 @@ function submitPin(){
           if(email){
             upd.memberEmails=firebase.firestore.FieldValue.arrayUnion(emailLower);
             upd.pendingMembers=firebase.firestore.FieldValue.arrayRemove(emailLower);
-            var mapKey='memberMap.'+emailLower.replace(/\./g,'%2E');
+            var mapKey='memberMap.'+emailLower.replace(/[.\/$\[\]#\/]/g,function(c){return '%'+c.charCodeAt(0).toString(16);});
             upd[mapKey]=uid;
           }
-          if(!payload.owner&&payload.createdBy&&emailLower&&payload.createdBy.toLowerCase()===emailLower){upd.owner=uid;}
+          if(!payload.owner&&payload.createdBy&&emailVerified&&emailLower&&payload.createdBy.toLowerCase()===emailLower){upd.owner=uid;}
           db.collection('families').doc(familyCode).update(upd).catch(function(){});
         }
         unlockApp();
@@ -792,7 +793,7 @@ function loadMembers(){
       if(isOwnerEmail)badge+='<span style="font-size:.75em;color:#4a7c3f;margin-left:6px">owner</span>';
       if(m.status==='pending')badge+='<span style="font-size:.75em;color:#e67e00;margin-left:6px">pending</span>';
       var removeBtn='';
-      if(isOwner&&!isMe){removeBtn='<a href="#" onclick="removeMember(\''+esc(m.email)+'\',\''+m.status+'\');return false;" style="float:right;color:#c33;font-size:.8em;text-decoration:none" title="Remove">&#10005;</a>';}
+      if(isOwner&&!isMe){removeBtn='<a href="#" class="remove-member-btn" data-email="'+esc(m.email)+'" data-status="'+esc(m.status)+'" style="float:right;color:#c33;font-size:.8em;text-decoration:none;cursor:pointer" title="Remove">&#10005;</a>';}
       h+='<div style="padding:6px 0;border-bottom:1px solid #eee;font-size:.85em">'+removeBtn+esc(m.email)+badge+'</div>';
     });
     if(all.length>limit&&!showAll){
@@ -802,6 +803,9 @@ function loadMembers(){
     }
     h+='</div>';
     el.innerHTML=h;
+    el.querySelectorAll('.remove-member-btn').forEach(function(btn){
+      btn.addEventListener('click',function(e){e.preventDefault();removeMember(btn.getAttribute('data-email'),btn.getAttribute('data-status'));});
+    });
   }).catch(function(){});
 }
 function removeMember(email,status){
@@ -816,7 +820,7 @@ function removeMember(email,status){
     } else {
       upd.memberEmails=firebase.firestore.FieldValue.arrayRemove(email);
       upd.pendingMembers=firebase.firestore.FieldValue.arrayRemove(email);
-      var mapKey=email.replace(/\./g,'%2E');
+      var mapKey=email.replace(/[.\/$\[\]#\/]/g,function(c){return '%'+c.charCodeAt(0).toString(16);});
       var memberMap=d.memberMap||{};
       var uid=memberMap[mapKey];
       if(uid){
