@@ -33,6 +33,10 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
 .pin-key.empty{background:transparent;cursor:default}
 @keyframes shake{0%,100%{transform:translateX(0)}10%,30%,50%,70%,90%{transform:translateX(-6px)}20%,40%,60%,80%{transform:translateX(6px)}}
 .shake{animation:shake .5s ease-in-out}
+@keyframes fadeUp{0%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(-20px)}}
+@keyframes fadeIn{0%{opacity:0}100%{opacity:1}}
+.fade-up{animation:fadeUp .4s ease-out forwards}
+.fade-in{animation:fadeIn .4s ease-in forwards}
 
 .topbar{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:var(--orange);color:#fff}
 .app-toppad .topbar{padding-top:44px}
@@ -528,11 +532,39 @@ function submitNewPin(){
 /* ===== UNLOCK ===== */
 function unlockApp(){
   pinFailCount=0;if(pinLockTimer){clearTimeout(pinLockTimer);pinLockTimer=null;}pinLocked=false;
-  document.querySelectorAll('.fullscreen').forEach(function(s){s.classList.add('hidden');});
+  var screen=document.getElementById('screenPin');
+  if(screen&&!screen.classList.contains('hidden')){
+    var dots=screen.querySelector('.pin-dots');
+    var pad=screen.querySelector('.pin-pad');
+    var h1=screen.querySelector('h1');
+    var h2=screen.querySelector('h2');
+    var err=screen.querySelector('.setup-error');
+    var stat=screen.querySelector('.setup-status');
+    var btn=screen.querySelector('.setup-btn');
+    if(dots)dots.classList.add('fade-up');
+    setTimeout(function(){
+      if(h1)h1.classList.add('fade-up');
+      if(h2)h2.classList.add('fade-up');
+      if(pad)pad.classList.add('fade-up');
+      if(err)err.classList.add('fade-up');
+      if(stat)stat.classList.add('fade-up');
+      if(btn)btn.classList.add('fade-up');
+    },200);
+    setTimeout(function(){
+      [dots,pad,h1,h2,err,stat,btn].forEach(function(el){if(el)el.classList.remove('fade-up');});
+      screen.classList.add('hidden');
+      showApp();
+    },700);
+  } else {
+    document.querySelectorAll('.fullscreen').forEach(function(s){s.classList.add('hidden');});
+    showApp();
+  }
+}
+function showApp(){
   var ac=document.getElementById('appContainer');
   ac.style.display='flex';
-  /* In Android WebView, native padding handles insets and 100% height is correct.
-     In regular browsers, use window.innerHeight to avoid browser chrome overlap. */
+  ac.style.opacity='0';ac.classList.add('fade-in');
+  setTimeout(function(){ac.style.opacity='1';ac.classList.remove('fade-in');},400);
   if(typeof Android==='undefined'){
     function setVH(){ac.style.height=window.innerHeight+'px';}
     setVH();
