@@ -756,9 +756,10 @@ function renderSyncUI(){
   h+='</div>';
   h+='<div class="backup-section"><h3>Invite Family Member</h3><p class="setup-note">Enter the Google email of the person you want to invite. They must be invited before they can join.</p><input type="text" id="inviteEmail" placeholder="email@gmail.com" style="width:100%;padding:10px;border:2px solid #ddd;border-radius:10px;font-size:.9em;margin:6px 0"><button class="btn btn-orange" onclick="inviteMember()">Invite</button><div id="membersList"></div></div>';
   if(familyCode&&familyCode.length<12)h+='<div class="backup-section"><h3>\u26A0\uFE0F Upgrade Security</h3><p class="setup-note">Your family uses the old 6-character code. Upgrade to a 12-character code with stronger encryption. All family members will need the new code.</p><button class="btn btn-orange" onclick="migrateFamily()">Upgrade to v2</button></div>';
+  h+='<div id="ownerActions"></div>';
   h+='<div class="backup-section"><button class="btn-outline" onclick="resetAll()">Sign Out / Reset</button></div>';
   document.getElementById('syncContent').innerHTML=h;
-  if(familyCode)loadMembers();
+  if(familyCode){loadMembers();loadOwnerActions();}
 }
 function copyCode(){if(!familyCode)return;navigator.clipboard.writeText(familyCode).then(function(){showToast('Code copied!');}).catch(function(){showToast(familyCode);});}
 function forceSyncNow(){pushEncrypted().then(function(){renderSyncUI();showToast('Synced!');});}
@@ -834,6 +835,52 @@ function removeMember(email,status){
   }).then(function(){
     showToast('Removed '+email);loadMembers();
   }).catch(function(err){showToast('Error: '+(err.message||'Failed'));});
+}
+function loadOwnerActions(){
+  if(!familyCode)return;
+  var el=document.getElementById('ownerActions');if(!el)return;
+  db.collection('families').doc(familyCode).get().then(function(doc){
+    if(!doc.exists)return;
+    var d=doc.data();
+    if(!d.owner||!auth.currentUser||auth.currentUser.uid!==d.owner){el.innerHTML='';return;}
+    el.innerHTML='<div class="backup-section"><h3>Owner Settings</h3><button class="btn btn-orange" onclick="resetFamilyPin()">Reset PIN</button><p class="setup-note">Change the PIN for all family members. Everyone will need the new PIN to unlock.</p></div>';
+  }).catch(function(){});
+}
+function resetFamilyPin(){
+  if(!familyCode||!currentPin)return;
+  if(!confirm('Reset the family PIN? All members will need to use the new PIN.'))return;
+  var np='',phase='choose';
+  var div=document.createElement('div');div.className='overlay active';div.id='pinResetOverlay';
+  function renderResetUI(){
+    var dots='';var len=Math.max(np.length,MIN_PIN);for(var i=0;i<len;i++)dots+='<div class="pin-dot'+(i<np.length?' filled':'')+'"></div>';
+    div.innerHTML='<div class="modal"><button class="modal-close" onclick="document.getElementById(\'pinResetOverlay\').remove()">&times;</button><h2>'+(phase==='choose'?'New PIN ('+MIN_PIN+'-'+MAX_PIN+' digits)':'Confirm New PIN')+'</h2><div class="pin-dots">'+dots+'</div><div class="pin-pad" id="resetPinPad"></div><div class="setup-error" id="resetPinError"></div></div>';
+    document.body.appendChild(div);
+    var pad=document.getElementById('resetPinPad');
+    var keys='1234567890';
+    for(var i=0;i<keys.length;i++){(function(k){var b=document.createElement('button');b.className='pin-key';b.textContent=k;b.addEventListener('click',function(){if(np.length>=MAX_PIN)return;np+=k;renderResetUI();});pad.appendChild(b);})(keys[i]);}
+    var confirmBtn=document.createElement('button');confirmBtn.className='pin-key';confirmBtn.innerHTML='&#10003;';confirmBtn.addEventListener('click',doSubmit);
+    var zeroBtn=pad.children[9];pad.insertBefore(confirmBtn,zeroBtn);
+    var bk=document.createElement('button');bk.className='pin-key';bk.innerHTML='&#9003;';bk.addEventListener('click',function(){if(np.length>0){np=np.slice(0,-1);renderResetUI();}});pad.appendChild(bk);
+  }
+  var firstPin='';
+  function doSubmit(){
+    if(np.length<MIN_PIN){document.getElementById('resetPinError').textContent='At least '+MIN_PIN+' digits';return;}
+    if(phase==='choose'){firstPin=np;np='';phase='confirm';renderResetUI();}
+    else{
+      if(np!==firstPin){document.getElementById('resetPinError').textContent="PINs don't match";np='';firstPin='';phase='choose';renderResetUI();return;}
+      var newPin=np;div.remove();
+      var data=exportAllData();
+      currentPin=newPin;
+      encryptData(data,newPin).then(function(enc){
+        enc.updatedBy=(gUserInfo&&gUserInfo.email)||'';
+        enc.updatedAt=firebase.firestore.FieldValue.serverTimestamp();
+        return db.collection('families').doc(familyCode).update(enc);
+      }).then(function(){
+        showToast('PIN changed! Share the new PIN with family members.');
+      }).catch(function(err){showToast('Error: '+(err.message||'Failed'));});
+    }
+  }
+  renderResetUI();
 }
 function migrateFamily(){
   if(!currentPin||!familyCode){showToast('Not unlocked');return;}
