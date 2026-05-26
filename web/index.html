@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://apis.google.com; style-src 'self' 'unsafe-inline'; img-src https: data:; connect-src https://*.googleapis.com https://*.firebaseio.com https://*.cloudfunctions.net wss://*.firebaseio.com https://securetoken.googleapis.com; frame-src https://accounts.google.com https://*.firebaseapp.com; object-src 'none'; base-uri 'none'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://apis.google.com; style-src 'self' 'unsafe-inline'; img-src https: data:; connect-src https://*.googleapis.com https://*.firebaseio.com https://*.cloudfunctions.net wss://*.firebaseio.com https://securetoken.googleapis.com; frame-src https://accounts.google.com https://*.firebaseapp.com; object-src 'none'; base-uri 'none'; form-action 'self'; upgrade-insecure-requests; frame-ancestors 'none'">
 <title>Star Chart</title>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js" integrity="sha384-ZaR6mWzmJtrRibZ1Vm7SoHFr8OXjyAuGAXalGDKqbxFT18oi/z+oZLIRFkpeNor1" crossorigin="anonymous"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js" integrity="sha384-I1LYojsZ5RM1cOda44Z2h42Qa6YfsQ1XkXxREnhp4ueYBR/4d1pG1K+NZM537Vsj" crossorigin="anonymous"></script>
@@ -31,6 +31,8 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
 .pin-key{width:72px;height:56px;border-radius:14px;border:none;background:rgba(255,255,255,.25);color:#fff;font-size:1.5em;font-weight:700;cursor:pointer}
 .pin-key:active{background:rgba(255,255,255,.5)}
 .pin-key.empty{background:transparent;cursor:default}
+@keyframes shake{0%,100%{transform:translateX(0)}10%,30%,50%,70%,90%{transform:translateX(-6px)}20%,40%,60%,80%{transform:translateX(6px)}}
+.shake{animation:shake .5s ease-in-out}
 
 .topbar{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:var(--orange);color:#fff}
 .app-toppad .topbar{padding-top:44px}
@@ -398,6 +400,14 @@ function renderDots(id,val){var len=Math.max(val.length,MIN_PIN);var h='';for(va
 function pinPress(d){if(pinEntry.length>=MAX_PIN)return;pinEntry+=d;renderDots('pinDots',pinEntry);}
 function pinBackspace(){if(pinEntry.length>0){pinEntry=pinEntry.slice(0,-1);renderDots('pinDots',pinEntry);}}
 
+function pinFail(dotsId,errorId,msg){
+  var dots=document.getElementById(dotsId);
+  if(dots){dots.classList.add('shake');setTimeout(function(){dots.classList.remove('shake');},500);}
+  if(navigator.vibrate)navigator.vibrate([100,50,100]);
+  if(errorId)document.getElementById(errorId).textContent=msg||'Wrong PIN';
+  var st=document.getElementById('pinStatus');if(st)st.textContent='';
+}
+
 function submitPin(){
   if(pinEntry.length<MIN_PIN){document.getElementById('pinError').textContent='PIN must be at least '+MIN_PIN+' digits';return;}
   document.getElementById('pinError').textContent='';
@@ -405,8 +415,7 @@ function submitPin(){
   db.collection('families').doc(familyCode).get().then(function(doc){
     if(!doc.exists){
       pinEntry='';renderDots('pinDots',pinEntry);
-      document.getElementById('pinError').textContent='Family not found';
-      document.getElementById('pinStatus').textContent='';
+      pinFail('pinDots','pinError','Family not found');
       return;
     }
     var payload=doc.data();
@@ -420,8 +429,7 @@ function submitPin(){
       var isEmailMember=emailVerified&&emailLower&&(payload.memberEmails||[]).indexOf(emailLower)!==-1;
       if(!isMember&&!isPending&&!isEmailMember){
         pinEntry='';renderDots('pinDots',pinEntry);
-        document.getElementById('pinError').textContent='Wrong PIN';
-        document.getElementById('pinStatus').textContent='';
+        pinFail('pinDots','pinError','Wrong PIN');
         return;
       }
       return decryptData(payload,pinEntry).then(function(data){
@@ -441,19 +449,16 @@ function submitPin(){
         unlockApp();
       }).catch(function(){
         pinEntry='';renderDots('pinDots',pinEntry);
-        document.getElementById('pinError').textContent='Wrong PIN';
-        document.getElementById('pinStatus').textContent='';
+        pinFail('pinDots','pinError','Wrong PIN');
       });
     } else {
       pinEntry='';renderDots('pinDots',pinEntry);
-      document.getElementById('pinError').textContent='Invalid data';
-      document.getElementById('pinStatus').textContent='';
+      pinFail('pinDots','pinError','Invalid data');
     }
   }).catch(function(err){
     console.error(err);
     pinEntry='';renderDots('pinDots',pinEntry);
-    document.getElementById('pinError').textContent='Error reading data';
-    document.getElementById('pinStatus').textContent='';
+    pinFail('pinDots','pinError','Error reading data');
   });
 }
 
@@ -473,10 +478,11 @@ function submitNewPin(){
     renderDots('newPinDots',newPinEntry);
   } else {
     if(newPinEntry!==newPinFirst){
-      document.getElementById('newPinError').textContent="PINs don't match. Try again.";
       newPinEntry='';newPinFirst='';newPinPhase='choose';
+      renderDots('newPinDots',newPinEntry);
+      pinFail('newPinDots','newPinError',"PINs don't match. Try again.");
       document.getElementById('newPinTitle').textContent='Choose a PIN ('+MIN_PIN+'-'+MAX_PIN+' digits)';
-      renderDots('newPinDots',newPinEntry);return;
+      return;
     }
     currentPin=newPinEntry;
     document.getElementById('newPinError').textContent='';
@@ -874,7 +880,7 @@ function resetFamilyPin(){
       if(np.length<MIN_PIN){document.getElementById('resetPinError').textContent='At least '+MIN_PIN+' digits';return;}
       if(phase==='choose'){firstPin=np;np='';phase='confirm';renderResetUI();}
       else{
-        if(np!==firstPin){document.getElementById('resetPinError').textContent="PINs don't match";np='';firstPin='';phase='choose';renderResetUI();return;}
+        if(np!==firstPin){np='';firstPin='';phase='choose';renderResetUI();pinFail('pinResetOverlay','resetPinError',"PINs don't match");return;}
         var newPin=np;div.remove();
         var oldPin=currentPin;
         var data=exportAllData();
