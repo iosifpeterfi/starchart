@@ -734,6 +734,7 @@ function renderSyncUI(){
   if(familyCode)h+='<div style="text-align:center;margin:10px 0"><div style="font-size:1.4em;font-weight:800;letter-spacing:4px;color:var(--dark);word-break:break-all">'+esc(familyCode)+'</div><p class="setup-note">Family Code — share only with trusted family members</p></div>';
   h+='</div>';
   h+='<div class="backup-section"><h3>Invite Family Member</h3><p class="setup-note">Enter the Google email of the person you want to invite. They must be invited before they can join.</p><input type="text" id="inviteEmail" placeholder="email@gmail.com" style="width:100%;padding:10px;border:2px solid #ddd;border-radius:10px;font-size:.9em;margin:6px 0"><button class="btn btn-orange" onclick="inviteMember()">Invite</button></div>';
+  if(familyCode&&familyCode.length<12)h+='<div class="backup-section"><h3>\u26A0\uFE0F Upgrade Security</h3><p class="setup-note">Your family uses the old 6-character code. Upgrade to a 12-character code with stronger encryption. All family members will need the new code.</p><button class="btn btn-orange" onclick="migrateFamily()">Upgrade to v2</button></div>';
   h+='<div class="backup-section"><button class="btn-outline" onclick="resetAll()">Sign Out / Reset</button></div>';
   document.getElementById('syncContent').innerHTML=h;
 }
@@ -745,6 +746,33 @@ function inviteMember(){
   db.collection('families').doc(familyCode).update({
     pendingMembers:firebase.firestore.FieldValue.arrayUnion(email)
   }).then(function(){showToast('Invited '+email+'!');document.getElementById('inviteEmail').value='';}).catch(function(err){showToast('Error: '+(err.message||'Failed'));});
+}
+function migrateFamily(){
+  if(!currentPin||!familyCode){showToast('Not unlocked');return;}
+  if(!confirm('Upgrade to new 12-char code?\n\nYour old code will be deleted. All family members must use the new code.\n\nContinue?'))return;
+  var oldCode=familyCode;
+  var newCode=generateCode();
+  var data=exportAllData();
+  familyCode=newCode;
+  encryptData(data,currentPin).then(function(enc){
+    enc.createdBy=(gUserInfo&&gUserInfo.email)||'';
+    enc.createdAt=firebase.firestore.FieldValue.serverTimestamp();
+    enc.updatedBy=(gUserInfo&&gUserInfo.email)||'';
+    enc.updatedAt=firebase.firestore.FieldValue.serverTimestamp();
+    enc.members=[auth.currentUser.uid];
+    enc.pendingMembers=[];
+    return db.collection('families').doc(newCode).set(enc);
+  }).then(function(){
+    localStorage.setItem('sc_family_code',newCode);
+    return db.collection('families').doc(oldCode).delete();
+  }).then(function(){
+    pauseAutoSync();startRealtimeSync();
+    renderSyncUI();
+    showToast('Upgraded! New code: '+newCode);
+  }).catch(function(err){
+    familyCode=oldCode;
+    showToast('Migration failed: '+(err.message||''));
+  });
 }
 function resetAll(){
   if(!confirm('Sign out and erase all local data? This cannot be undone.'))return;
