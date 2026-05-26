@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com; style-src 'self' 'unsafe-inline'; img-src https: data:; connect-src https://*.googleapis.com https://*.firebaseio.com https://*.cloudfunctions.net wss://*.firebaseio.com; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://apis.google.com; style-src 'self' 'unsafe-inline'; img-src https: data:; connect-src https://*.googleapis.com https://*.firebaseio.com https://*.cloudfunctions.net wss://*.firebaseio.com https://securetoken.googleapis.com; frame-src https://accounts.google.com https://*.firebaseapp.com; object-src 'none'; base-uri 'none'; form-action 'self'">
 <title>Star Chart</title>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js" integrity="sha384-ZaR6mWzmJtrRibZ1Vm7SoHFr8OXjyAuGAXalGDKqbxFT18oi/z+oZLIRFkpeNor1" crossorigin="anonymous"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js" integrity="sha384-I1LYojsZ5RM1cOda44Z2h42Qa6YfsQ1XkXxREnhp4ueYBR/4d1pG1K+NZM537Vsj" crossorigin="anonymous"></script>
@@ -235,6 +235,11 @@ var firebaseConfig={
 firebase.initializeApp(firebaseConfig);
 var auth=firebase.auth();
 var db=firebase.firestore();
+auth.getRedirectResult().catch(function(err){
+  console.error('Redirect sign-in error:',err);
+  var el=document.getElementById('loginError');if(el)el.textContent=err.message||'Sign-in failed';
+  var st=document.getElementById('loginStatus');if(st)st.textContent='';
+});
 
 var PIN_LENGTH=6;
 var familyCode=null;
@@ -328,11 +333,7 @@ function startGoogleLogin(){
     Android.signInWithGoogle();
   } else {
     var provider=new firebase.auth.GoogleAuthProvider();
-    auth.signInWithPopup(provider).catch(function(err){
-      console.error(err);
-      document.getElementById('loginStatus').textContent='';
-      document.getElementById('loginError').textContent=err.message||'Sign-in failed';
-    });
+    auth.signInWithRedirect(provider);
   }
 }
 
