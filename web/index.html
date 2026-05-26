@@ -141,6 +141,7 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
   <input type="text" id="joinCode" placeholder="FAMILY CODE" maxlength="12" style="width:280px;padding:12px;border:none;border-radius:10px;font-size:1em;text-align:center;letter-spacing:3px;text-transform:uppercase;margin-top:4px">
   <button class="setup-btn" onclick="joinFamily()" style="margin-top:6px;background:rgba(0,0,0,.25)">Join Family</button>
   <div class="setup-error" id="familyError"></div>
+  <a href="#" onclick="auth.signOut();return false;" style="display:inline-block;margin-top:24px;color:rgba(255,255,255,.7);font-size:.85em;text-decoration:underline">Sign out of Google</a>
 </div>
 
 <!-- STEP 3: PIN ENTRY (existing family) -->
