@@ -2,8 +2,13 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /families/{familyId} {
-      // Anyone authenticated can read (they need the family code to query)
-      allow read: if request.auth != null;
+      // Only members or invited pending members can read
+      allow read: if request.auth != null
+        && (
+          request.auth.uid in resource.data.members
+          || (request.auth.token.email != null
+              && request.auth.token.email.lower() in resource.data.pendingMembers)
+        );
 
       // Anyone authenticated can create a new family
       allow create: if request.auth != null
@@ -13,9 +18,7 @@ service cloud.firestore {
       // Members can update, OR a pending member can join (add themselves)
       allow update: if request.auth != null
         && (
-          // Existing member
           request.auth.uid in resource.data.members
-          // Or pending member joining (email in pendingMembers)
           || (request.auth.token.email != null
               && request.auth.token.email.lower() in resource.data.pendingMembers)
         );
