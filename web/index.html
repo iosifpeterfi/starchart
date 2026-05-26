@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com; style-src 'self' 'unsafe-inline'; img-src https: data:; connect-src https://*.googleapis.com https://*.firebaseio.com https://*.cloudfunctions.net wss://*.firebaseio.com; frame-src 'none'; object-src 'none'; base-uri 'none'">
 <title>Star Chart</title>
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js" integrity="sha384-ZaR6mWzmJtrRibZ1Vm7SoHFr8OXjyAuGAXalGDKqbxFT18oi/z+oZLIRFkpeNor1" crossorigin="anonymous"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js" integrity="sha384-I1LYojsZ5RM1cOda44Z2h42Qa6YfsQ1XkXxREnhp4ueYBR/4d1pG1K+NZM537Vsj" crossorigin="anonymous"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js" integrity="sha384-Ke0FJhH7LyRqDxZ0wt+/OXV38yfQVu7g9VPEEGjYmB4RVOY/ta04uecRhsMwT7V3" crossorigin="anonymous"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 :root{--orange:#FF9B35;--yellow:#FFEE3F;--green:#4CAF50;--bg:#FFF8E7;--card:#FFFFFF;--dark:#333333;--muted:#999999;--mandatory-bg:#FFF4E0;--done-bg:#DCEDC8;--locked-bg:#FBE9E7}
@@ -306,7 +306,7 @@ function getTotalWithdrawn(){var w=getWithdrawals(),t=0;for(var i=0;i<w.length;i
 function getDayPoints(d){var dd=getDayData(d),tasks=getTasks(),p=0;for(var i=0;i<tasks.length;i++)if(dd[tasks[i].id]&&!tasks[i].mandatory)p+=tasks[i].points;return p;}
 
 /* ===== ENCRYPTION ===== */
-function b64E(buf){return btoa(String.fromCharCode.apply(null,new Uint8Array(buf)));}
+function b64E(buf){var u=new Uint8Array(buf),s='';for(var i=0;i<u.length;i+=8192)s+=String.fromCharCode.apply(null,u.subarray(i,i+8192));return btoa(s);}
 function b64D(s){var b=atob(s),a=new Uint8Array(b.length);for(var i=0;i<b.length;i++)a[i]=b.charCodeAt(i);return a;}
 function deriveKey(pin,salt){var e=new TextEncoder();return crypto.subtle.importKey('raw',e.encode(pin),'PBKDF2',false,['deriveKey']).then(function(k){return crypto.subtle.deriveKey({name:'PBKDF2',salt:salt,iterations:100000,hash:'SHA-256'},k,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);});}
 function encryptData(data,pin){var s=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12)),e=new TextEncoder();return deriveKey(pin,s).then(function(k){return crypto.subtle.encrypt({name:'AES-GCM',iv:iv},k,e.encode(JSON.stringify(data)));}).then(function(ct){return{encrypted:true,v:1,salt:b64E(s),iv:b64E(iv),data:b64E(ct)};});}
@@ -368,7 +368,7 @@ auth.onAuthStateChanged(function(user){
 });
 
 /* ===== FAMILY CODE ===== */
-function generateCode(){var c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789',r='';for(var i=0;i<6;i++)r+=c[Math.floor(Math.random()*c.length)];return r;}
+function generateCode(){var c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789',r='',rnd=crypto.getRandomValues(new Uint8Array(6));for(var i=0;i<6;i++)r+=c[rnd[i]%c.length];return r;}
 
 function joinFamily(){
   var code=document.getElementById('joinCode').value.trim().toUpperCase();
@@ -496,7 +496,7 @@ function mergeFromRemote(rd){
     else if(k==='sc_deleted_tasks'){/* local is authoritative */}
     else if(k==='sc_withdrawals'){var lw=getWithdrawals(),rw=[];try{rw=JSON.parse(rd[k]);}catch(e){}var tm={};for(var i=0;i<lw.length;i++)tm[lw[i].timestamp]=lw[i];var wc=Object.keys(tm).length;for(var i=0;i<rw.length;i++)if(!tm[rw[i].timestamp])tm[rw[i].timestamp]=rw[i];if(Object.keys(tm).length>wc){var mg=[];for(var t in tm)mg.push(tm[t]);mg.sort(function(a,b){return(a.timestamp||0)-(b.timestamp||0);});localStorage.setItem(k,JSON.stringify(mg));changed=true;}}
     else if(k.indexOf('sc_day_')===0){var ld={};try{ld=JSON.parse(localStorage.getItem(k)||'{}');}catch(e){}var rdd={};try{rdd=JSON.parse(rd[k]);}catch(e){}var merged={};var now=Date.now();for(var tid in ld)merged[tid]=ld[tid];for(var tid in rdd){var lct=localChanges[tid];if(!lct||now-lct>5000)merged[tid]=rdd[tid];}var ms=JSON.stringify(merged),ls=localStorage.getItem(k)||'{}';if(ms!==ls){localStorage.setItem(k,ms);changed=true;}}
-    else{if(!localStorage.getItem(k)){localStorage.setItem(k,rd[k]);changed=true;}}
+    else if(k.indexOf('sc_')===0){if(!localStorage.getItem(k)){localStorage.setItem(k,rd[k]);changed=true;}}
   }
   return changed;
 }
@@ -739,7 +739,7 @@ function resetAll(){
 }
 function forgetFamily(){
   familyCode=null;currentPin=null;
-  localStorage.removeItem('sc_family_code');
+  var keysToRemove=[];for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&k.indexOf('sc_')===0)keysToRemove.push(k);}for(var i=0;i<keysToRemove.length;i++)localStorage.removeItem(keysToRemove[i]);
   if(unsubFirestore)unsubFirestore();
   if(bgSyncInterval)clearInterval(bgSyncInterval);
   if(syncTimer)clearTimeout(syncTimer);
