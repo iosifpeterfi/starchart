@@ -8,6 +8,7 @@ import android.os.Bundle
 import android.util.Log
 import android.view.WindowManager
 import android.webkit.*
+import org.json.JSONObject
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
@@ -30,10 +31,9 @@ class MainActivity : AppCompatActivity() {
             val account = task.getResult(ApiException::class.java)
             val idToken = account.idToken
             if (idToken != null) {
-                // Pass token to WebView — Firebase will sign in with this credential
-                val js = "javascript:nativeSignInWithToken('$idToken')"
+                val safeToken = JSONObject.quote(idToken)
                 webView.evaluateJavascript(
-                    "nativeSignInWithToken('$idToken')", null
+                    "nativeSignInWithToken($safeToken)", null
                 )
             } else {
                 webView.evaluateJavascript(
@@ -42,8 +42,9 @@ class MainActivity : AppCompatActivity() {
             }
         } catch (e: ApiException) {
             Log.e("StarChart", "Google sign-in failed: ${e.statusCode}", e)
+            val safeMsg = JSONObject.quote("Sign-in failed (${e.statusCode})")
             webView.evaluateJavascript(
-                "nativeSignInFailed('Sign-in failed (${e.statusCode})')", null
+                "nativeSignInFailed($safeMsg)", null
             )
         }
     }
