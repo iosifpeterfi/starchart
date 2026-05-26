@@ -417,7 +417,7 @@ function submitPin(){
         var email=auth.currentUser&&auth.currentUser.email;
         if(uid){
           var upd={members:firebase.firestore.FieldValue.arrayUnion(uid)};
-          if(email)upd.pendingMembers=firebase.firestore.FieldValue.arrayRemove(email.toLowerCase());
+          if(email){upd.memberEmails=firebase.firestore.FieldValue.arrayUnion(email.toLowerCase());upd.pendingMembers=firebase.firestore.FieldValue.arrayRemove(email.toLowerCase());}
           db.collection('families').doc(familyCode).update(upd).catch(function(){});
         }
         unlockApp();
@@ -468,6 +468,7 @@ function submitNewPin(){
       enc.createdBy=(gUserInfo&&gUserInfo.email)||'';
       enc.createdAt=firebase.firestore.FieldValue.serverTimestamp();
       enc.members=[auth.currentUser.uid];
+      enc.memberEmails=gUserInfo&&gUserInfo.email?[gUserInfo.email.toLowerCase()]:[];
       enc.pendingMembers=[];
       return db.collection('families').doc(familyCode).set(enc);
     }).then(function(){
@@ -733,10 +734,11 @@ function renderSyncUI(){
   h+='<div class="backup-section"><h3>Share with Family</h3><p class="setup-note">Share this code with family members. They sign in with Google, enter the code, and use the same PIN.</p>';
   if(familyCode)h+='<div style="text-align:center;margin:10px 0"><div style="font-size:1.4em;font-weight:800;letter-spacing:4px;color:var(--dark);word-break:break-all">'+esc(familyCode)+'</div><button onclick="copyCode()" style="margin:6px 0;padding:6px 16px;border:2px solid #ddd;border-radius:8px;background:#fff;font-size:.85em;cursor:pointer">\uD83D\uDCCB Copy Code</button><p class="setup-note">Family Code — share only with trusted family members</p></div>';
   h+='</div>';
-  h+='<div class="backup-section"><h3>Invite Family Member</h3><p class="setup-note">Enter the Google email of the person you want to invite. They must be invited before they can join.</p><input type="text" id="inviteEmail" placeholder="email@gmail.com" style="width:100%;padding:10px;border:2px solid #ddd;border-radius:10px;font-size:.9em;margin:6px 0"><button class="btn btn-orange" onclick="inviteMember()">Invite</button></div>';
+  h+='<div class="backup-section"><h3>Invite Family Member</h3><p class="setup-note">Enter the Google email of the person you want to invite. They must be invited before they can join.</p><input type="text" id="inviteEmail" placeholder="email@gmail.com" style="width:100%;padding:10px;border:2px solid #ddd;border-radius:10px;font-size:.9em;margin:6px 0"><button class="btn btn-orange" onclick="inviteMember()">Invite</button><div id="membersList"></div></div>';
   if(familyCode&&familyCode.length<12)h+='<div class="backup-section"><h3>\u26A0\uFE0F Upgrade Security</h3><p class="setup-note">Your family uses the old 6-character code. Upgrade to a 12-character code with stronger encryption. All family members will need the new code.</p><button class="btn btn-orange" onclick="migrateFamily()">Upgrade to v2</button></div>';
   h+='<div class="backup-section"><button class="btn-outline" onclick="resetAll()">Sign Out / Reset</button></div>';
   document.getElementById('syncContent').innerHTML=h;
+  if(familyCode)loadMembers();
 }
 function copyCode(){if(!familyCode)return;navigator.clipboard.writeText(familyCode).then(function(){showToast('Code copied!');}).catch(function(){showToast(familyCode);});}
 function forceSyncNow(){pushEncrypted().then(function(){renderSyncUI();showToast('Synced!');});}
@@ -746,7 +748,35 @@ function inviteMember(){
   if(!familyCode){showToast('No family');return;}
   db.collection('families').doc(familyCode).update({
     pendingMembers:firebase.firestore.FieldValue.arrayUnion(email)
-  }).then(function(){showToast('Invited '+email+'!');document.getElementById('inviteEmail').value='';}).catch(function(err){showToast('Error: '+(err.message||'Failed'));});
+  }).then(function(){showToast('Invited '+email+'!');document.getElementById('inviteEmail').value='';loadMembers();}).catch(function(err){showToast('Error: '+(err.message||'Failed'));});
+}
+function loadMembers(){
+  if(!familyCode)return;
+  var el=document.getElementById('membersList');if(!el)return;
+  db.collection('families').doc(familyCode).get().then(function(doc){
+    if(!doc.exists)return;
+    var d=doc.data();
+    var members=(d.memberEmails||[]).slice();
+    var pending=(d.pendingMembers||[]).slice();
+    var all=[];
+    members.forEach(function(e){all.push({email:e,status:'member'});});
+    pending.forEach(function(e){if(!members.some(function(m){return m===e;}))all.push({email:e,status:'pending'});});
+    if(all.length===0){el.innerHTML='';return;}
+    var limit=3;var showAll=el.getAttribute('data-show-all')==='true';
+    var visible=showAll?all:all.slice(0,limit);
+    var h='<div style="margin-top:12px"><div style="font-weight:700;font-size:.9em;margin-bottom:6px">Members ('+all.length+')</div>';
+    visible.forEach(function(m){
+      var badge=m.status==='pending'?'<span style="font-size:.75em;color:#e67e00;margin-left:6px">pending</span>':'';
+      h+='<div style="padding:6px 0;border-bottom:1px solid #eee;font-size:.85em">'+esc(m.email)+badge+'</div>';
+    });
+    if(all.length>limit&&!showAll){
+      h+='<a href="#" onclick="document.getElementById(\'membersList\').setAttribute(\'data-show-all\',\'true\');loadMembers();return false;" style="display:inline-block;margin-top:8px;font-size:.85em;color:var(--orange)">Show all '+all.length+' members</a>';
+    } else if(all.length>limit&&showAll){
+      h+='<a href="#" onclick="document.getElementById(\'membersList\').setAttribute(\'data-show-all\',\'false\');loadMembers();return false;" style="display:inline-block;margin-top:8px;font-size:.85em;color:var(--orange)">Show less</a>';
+    }
+    h+='</div>';
+    el.innerHTML=h;
+  }).catch(function(){});
 }
 function migrateFamily(){
   if(!currentPin||!familyCode){showToast('Not unlocked');return;}
@@ -762,6 +792,7 @@ function migrateFamily(){
     enc.updatedBy=(gUserInfo&&gUserInfo.email)||'';
     enc.updatedAt=firebase.firestore.FieldValue.serverTimestamp();
     enc.members=[auth.currentUser.uid];
+    enc.memberEmails=gUserInfo&&gUserInfo.email?[gUserInfo.email.toLowerCase()]:[];
     enc.pendingMembers=[];
     return db.collection('families').doc(newCode).set(enc);
   }).then(function(){
