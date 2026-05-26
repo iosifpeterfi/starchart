@@ -418,7 +418,7 @@ function submitPin(){
       var isEmailMember=emailLower&&(payload.memberEmails||[]).indexOf(emailLower)!==-1;
       if(!isMember&&!isPending&&!isEmailMember){
         pinEntry='';renderDots('pinDots',pinEntry);
-        document.getElementById('pinError').textContent='Access denied — not a member';
+        document.getElementById('pinError').textContent='Wrong PIN';
         document.getElementById('pinStatus').textContent='';
         return;
       }
