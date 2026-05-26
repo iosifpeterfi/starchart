@@ -236,12 +236,6 @@ var firebaseConfig={
 firebase.initializeApp(firebaseConfig);
 var auth=firebase.auth();
 var db=firebase.firestore();
-auth.getRedirectResult().catch(function(err){
-  console.error('Redirect sign-in error:',err);
-  var el=document.getElementById('loginError');if(el)el.textContent=err.message||'Sign-in failed';
-  var st=document.getElementById('loginStatus');if(st)st.textContent='';
-});
-
 var PIN_LENGTH=6;
 var familyCode=null;
 var currentPin=null;
@@ -334,7 +328,11 @@ function startGoogleLogin(){
     Android.signInWithGoogle();
   } else {
     var provider=new firebase.auth.GoogleAuthProvider();
-    auth.signInWithRedirect(provider);
+    auth.signInWithPopup(provider).catch(function(err){
+      console.error(err);
+      document.getElementById('loginStatus').textContent='';
+      document.getElementById('loginError').textContent=err.message||'Sign-in failed';
+    });
   }
 }
 
@@ -420,6 +418,7 @@ function submitPin(){
         if(uid){
           var upd={members:firebase.firestore.FieldValue.arrayUnion(uid)};
           if(email){upd.memberEmails=firebase.firestore.FieldValue.arrayUnion(email.toLowerCase());upd.pendingMembers=firebase.firestore.FieldValue.arrayRemove(email.toLowerCase());}
+          if(!payload.owner&&payload.createdBy&&email&&payload.createdBy.toLowerCase()===email.toLowerCase()){upd.owner=uid;}
           db.collection('families').doc(familyCode).update(upd).catch(function(){});
         }
         unlockApp();
@@ -469,6 +468,7 @@ function submitNewPin(){
     encryptData(data,currentPin).then(function(enc){
       enc.createdBy=(gUserInfo&&gUserInfo.email)||'';
       enc.createdAt=firebase.firestore.FieldValue.serverTimestamp();
+      enc.owner=auth.currentUser.uid;
       enc.members=[auth.currentUser.uid];
       enc.memberEmails=gUserInfo&&gUserInfo.email?[gUserInfo.email.toLowerCase()]:[];
       enc.pendingMembers=[];
@@ -758,6 +758,9 @@ function loadMembers(){
   db.collection('families').doc(familyCode).get().then(function(doc){
     if(!doc.exists)return;
     var d=doc.data();
+    var owner=d.owner||'';
+    var isOwner=auth.currentUser&&auth.currentUser.uid===owner;
+    var ownerEmail=(d.createdBy||'').toLowerCase();
     var members=(d.memberEmails||[]).slice();
     var pending=(d.pendingMembers||[]).slice();
     var all=[];
@@ -768,8 +771,14 @@ function loadMembers(){
     var visible=showAll?all:all.slice(0,limit);
     var h='<div style="margin-top:12px"><div style="font-weight:700;font-size:.9em;margin-bottom:6px">Members ('+all.length+')</div>';
     visible.forEach(function(m){
-      var badge=m.status==='pending'?'<span style="font-size:.75em;color:#e67e00;margin-left:6px">pending</span>':'';
-      h+='<div style="padding:6px 0;border-bottom:1px solid #eee;font-size:.85em">'+esc(m.email)+badge+'</div>';
+      var isMe=gUserInfo&&gUserInfo.email&&m.email===gUserInfo.email.toLowerCase();
+      var isOwnerEmail=m.email===ownerEmail;
+      var badge='';
+      if(isOwnerEmail)badge+='<span style="font-size:.75em;color:#4a7c3f;margin-left:6px">owner</span>';
+      if(m.status==='pending')badge+='<span style="font-size:.75em;color:#e67e00;margin-left:6px">pending</span>';
+      var removeBtn='';
+      if(isOwner&&!isMe){removeBtn='<a href="#" onclick="removeMember(\''+esc(m.email)+'\',\''+m.status+'\');return false;" style="float:right;color:#c33;font-size:.8em;text-decoration:none" title="Remove">&#10005;</a>';}
+      h+='<div style="padding:6px 0;border-bottom:1px solid #eee;font-size:.85em">'+removeBtn+esc(m.email)+badge+'</div>';
     });
     if(all.length>limit&&!showAll){
       h+='<a href="#" onclick="document.getElementById(\'membersList\').setAttribute(\'data-show-all\',\'true\');loadMembers();return false;" style="display:inline-block;margin-top:8px;font-size:.85em;color:var(--orange)">Show all '+all.length+' members</a>';
@@ -779,6 +788,20 @@ function loadMembers(){
     h+='</div>';
     el.innerHTML=h;
   }).catch(function(){});
+}
+function removeMember(email,status){
+  if(!familyCode)return;
+  if(!confirm('Remove '+email+' from this family?'))return;
+  var upd={};
+  if(status==='pending'){
+    upd.pendingMembers=firebase.firestore.FieldValue.arrayRemove(email);
+  } else {
+    upd.memberEmails=firebase.firestore.FieldValue.arrayRemove(email);
+    upd.pendingMembers=firebase.firestore.FieldValue.arrayRemove(email);
+  }
+  db.collection('families').doc(familyCode).update(upd).then(function(){
+    showToast('Removed '+email);loadMembers();
+  }).catch(function(err){showToast('Error: '+(err.message||'Failed'));});
 }
 function migrateFamily(){
   if(!currentPin||!familyCode){showToast('Not unlocked');return;}
@@ -793,6 +816,7 @@ function migrateFamily(){
     enc.createdAt=firebase.firestore.FieldValue.serverTimestamp();
     enc.updatedBy=(gUserInfo&&gUserInfo.email)||'';
     enc.updatedAt=firebase.firestore.FieldValue.serverTimestamp();
+    enc.owner=auth.currentUser.uid;
     enc.members=[auth.currentUser.uid];
     enc.memberEmails=gUserInfo&&gUserInfo.email?[gUserInfo.email.toLowerCase()]:[];
     enc.pendingMembers=[];
