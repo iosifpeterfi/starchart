@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.StarChart" parent="Theme.AppCompat.Light.NoActionBar">
+        <item name="android:statusBarColor">#FFFF9B35</item>
+        <item name="android:navigationBarColor">#FFFFF8E7</item>
+    </style>
+</resources>

@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "685345253912",
+    "project_id": "starchart-373cd",
+    "storage_bucket": "starchart-373cd.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:685345253912:android:c3e796b4c9c01beb40f16d",
+        "android_client_info": {
+          "package_name": "com.peterfi.starchart"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "685345253912-4jh32f467pbn3u5clrj9nroosn7k2vce.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBxbRRhcXr2odaeE0CNfLL4RYL6_0b7VSQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "685345253912-4jh32f467pbn3u5clrj9nroosn7k2vce.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

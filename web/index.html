@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Star Chart</title>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{--orange:#FF9B35;--yellow:#FFEE3F;--green:#4CAF50;--bg:#FFF8E7;--card:#FFFFFF;--dark:#333333;--muted:#999999;--mandatory-bg:#FFF4E0;--done-bg:#DCEDC8;--locked-bg:#FBE9E7}
+html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--dark);touch-action:manipulation}
+
+.fullscreen{position:fixed;top:0;left:0;right:0;bottom:0;background:linear-gradient(135deg,var(--orange),var(--yellow));z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:center;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
+.fullscreen.hidden{display:none}
+.fullscreen h1{font-size:3em;margin-bottom:4px}
+.fullscreen h2{color:#fff;font-size:1.2em;margin-bottom:20px;font-weight:600}
+.fullscreen p{color:rgba(255,255,255,.85);font-size:.85em;max-width:320px;text-align:center;line-height:1.4;margin-bottom:16px}
+.setup-btn{width:280px;padding:12px;border:none;border-radius:12px;font-size:1em;font-weight:700;cursor:pointer;color:#fff;background:rgba(0,0,0,.2);margin-top:8px}
+.setup-btn:active{background:rgba(0,0,0,.35)}
+.setup-btn.google{background:#4285F4;display:flex;align-items:center;justify-content:center;gap:8px}
+.setup-error{color:#fff;font-size:.85em;margin-top:8px;min-height:20px;text-align:center;max-width:300px}
+.setup-status{color:rgba(255,255,255,.7);font-size:.75em;margin-top:6px;text-align:center}
+
+.pin-dots{display:flex;gap:10px;margin-bottom:18px}
+.pin-dot{width:16px;height:16px;border-radius:50%;background:rgba(255,255,255,.3);border:2px solid #fff;transition:background .15s}
+.pin-dot.filled{background:#fff}
+.pin-pad{display:grid;grid-template-columns:repeat(3,72px);gap:10px}
+.pin-key{width:72px;height:56px;border-radius:14px;border:none;background:rgba(255,255,255,.25);color:#fff;font-size:1.5em;font-weight:700;cursor:pointer}
+.pin-key:active{background:rgba(255,255,255,.5)}
+.pin-key.empty{background:transparent;cursor:default}
+
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:var(--orange);color:#fff}
+.app-toppad .topbar{padding-top:44px}
+.topbar-title{font-size:1.1em;font-weight:700}
+.topbar-actions{display:flex;gap:10px;align-items:center}
+.topbar-actions button{background:none;border:none;color:#fff;font-size:1.4em;cursor:pointer;padding:4px 6px;border-radius:6px}
+.topbar-actions button:active{background:rgba(255,255,255,.3)}
+.sync-dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:2px;vertical-align:middle}
+.sync-dot.green{background:#4CAF50}.sync-dot.yellow{background:#FFEE3F}.sync-dot.red{background:#E53935}.sync-dot.grey{background:#999}
+.sync-dot.spin{animation:spin-dot .8s linear infinite}
+@keyframes spin-dot{0%{opacity:1}50%{opacity:.3}100%{opacity:1}}
+
+.header{background:linear-gradient(135deg,var(--orange),var(--yellow));padding:8px 16px;text-align:center;color:var(--dark)}
+.header .stars{font-size:1.8em;font-weight:800;filter:drop-shadow(0 2px 3px rgba(0,0,0,.35));max-width:80%;margin:0 auto;overflow:hidden}
+.header .status{font-size:.85em;margin-top:1px;color:rgba(0,0,0,.7)}
+
+.main{padding:4px 12px;flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px}
+.section-title{font-size:.9em;font-weight:700;margin:4px 0 3px;padding-left:4px}
+.grid{display:flex;flex-wrap:wrap;justify-content:space-evenly;row-gap:var(--grid-gap,4px);margin-bottom:4px}
+
+.card{background:var(--card);border-radius:12px;border:2px solid var(--orange);text-align:center;cursor:pointer;transition:transform .15s;user-select:none;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;width:var(--card-size,80px);height:var(--card-size,80px);box-sizing:border-box;overflow:hidden}
+.card.optional{border-color:var(--green)}.card.done{background:var(--done-bg);border-color:var(--green)}.card.locked{background:var(--locked-bg);border-color:#ccc;opacity:.7}.card.mandatory-bg{background:var(--mandatory-bg)}
+.card .emoji{line-height:1.1}.card .label{font-weight:600;line-height:1.1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;padding:0 2px}.card .pts{color:var(--muted);display:flex;justify-content:center}
+.star-row{display:inline-flex;justify-content:center}.star-row span{display:inline-block;filter:drop-shadow(0 1px 2px rgba(0,0,0,.3))}
+.card .check{position:absolute;top:2px;right:4px;font-size:.8em}.card .lock{position:absolute;top:2px;right:4px;font-size:.7em}
+.card.bounce{animation:bounce .3s}
+@keyframes bounce{0%{transform:scale(1)}30%{transform:scale(.9)}60%{transform:scale(1.08)}100%{transform:scale(1)}}
+
+.bottom-bar{padding:10px 16px calc(10px + env(safe-area-inset-bottom));text-align:center;background:var(--bg);flex-shrink:0}
+.money-btn{background:linear-gradient(135deg,var(--orange),var(--yellow));color:var(--dark);border:none;border-radius:30px;padding:10px 40px;font-size:1.05em;font-weight:700;cursor:pointer;width:90%;max-width:400px;box-shadow:0 3px 8px rgba(0,0,0,.15)}
+.money-btn:active{transform:scale(.95)}
+
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.85);color:#fff;padding:10px 20px;border-radius:20px;font-size:.9em;z-index:999;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap}
+.toast.show{opacity:1}
+
+.confetti-piece{position:fixed;width:8px;height:8px;border-radius:50%;z-index:998;pointer-events:none;animation:confetti-fall 1.2s ease-out forwards}
+@keyframes confetti-fall{0%{opacity:1;transform:translateY(0) rotate(0deg) scale(1)}100%{opacity:0;transform:translateY(300px) rotate(720deg) scale(0)}}
+
+.overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:100;display:none;justify-content:center;align-items:center}
+.overlay.active{display:flex}
+.modal{background:#fff;border-radius:18px;width:92%;max-width:500px;max-height:88vh;overflow-y:auto;padding:20px;position:relative}
+.modal h2{text-align:center;margin-bottom:12px;font-size:1.2em}
+.modal-close{position:absolute;top:10px;right:14px;font-size:1.4em;background:none;border:none;cursor:pointer;color:var(--dark)}
+.modal label{display:block;font-weight:600;margin:8px 0 4px;font-size:.9em}
+.modal input[type="text"],.modal input[type="number"],.modal input[type="password"]{width:100%;padding:10px;border:2px solid #ddd;border-radius:10px;font-size:1em}
+.modal .btn{display:block;width:100%;padding:12px;border:none;border-radius:12px;font-size:1em;font-weight:700;cursor:pointer;margin-top:10px;color:#fff}
+.btn-orange{background:var(--orange)}.btn-green{background:var(--green)}.btn-red{background:#E53935}.btn-blue{background:#4285F4}
+
+.emoji-picker{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+.emoji-picker span{font-size:1.6em;cursor:pointer;padding:4px;border-radius:8px;border:2px solid transparent}
+.emoji-picker span.selected{border-color:var(--orange);background:var(--mandatory-bg)}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:6px 0}
+.toggle{width:48px;height:26px;border-radius:13px;background:#ccc;position:relative;cursor:pointer;transition:background .2s}
+.toggle.on{background:var(--green)}
+.toggle::after{content:'';position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:left .2s}
+.toggle.on::after{left:25px}
+
+.stat-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee;font-size:.9em}
+.stat-row:last-child{border:none}.stat-label{color:var(--muted)}.stat-value{font-weight:700}
+.history-item{padding:10px;border-bottom:1px solid #eee;cursor:pointer;display:flex;justify-content:space-between;align-items:center}
+.history-item:active{background:#f5f5f5}.history-date{font-weight:600}.history-pts{color:var(--orange);font-weight:700}
+.withdrawal-item{padding:8px 0;border-bottom:1px solid #eee;font-size:.85em}
+.task-item{display:flex;align-items:center;gap:8px;padding:6px 0;font-size:.9em}
+.chart-container{margin:12px 0}
+.chart-bar-row{display:flex;align-items:center;gap:6px;margin:3px 0;font-size:.75em}
+.chart-bar{height:16px;background:linear-gradient(90deg,var(--orange),var(--yellow));border-radius:8px;min-width:2px;transition:width .3s}
+.chart-date{width:50px;text-align:right;color:var(--muted);flex-shrink:0}.chart-val{width:24px;font-weight:700;flex-shrink:0}
+
+.backup-section{margin:16px 0;padding:14px;background:#f8f9fa;border-radius:12px}
+.backup-section h3{font-size:1em;margin-bottom:8px}
+.backup-info{font-size:.8em;color:var(--muted);margin-top:6px}
+.backup-user{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #eee;margin-bottom:10px}
+.backup-user img{width:36px;height:36px;border-radius:50%}
+.backup-user-info{flex:1}.backup-user-name{font-weight:700;font-size:.95em}.backup-user-email{font-size:.8em;color:var(--muted)}
+.btn-outline{background:#fff;color:var(--dark);border:2px solid #ddd;display:block;width:100%;padding:10px;border-radius:12px;font-size:.9em;font-weight:600;cursor:pointer;margin-top:8px;text-align:center}
+.btn-outline:active{background:#f5f5f5}
+.setup-note{font-size:.8em;color:var(--muted);margin:8px 0;line-height:1.4}
+</style>
+</head>
+<body>
+
+<!-- STEP 1: GOOGLE SIGN-IN -->
+<!-- Loading splash while checking auth -->
+<div class="fullscreen" id="screenLoading">
+  <h1>&#11088;</h1>
+  <h2>Star Chart</h2>
+  <div class="setup-status">Loading...</div>
+</div>
+
+<div class="fullscreen hidden" id="screenLogin">
+  <h1>&#11088;</h1>
+  <h2>Star Chart</h2>
+  <p>Sign in with Google to sync your data across devices.</p>
+  <button class="setup-btn google" id="googleLoginBtn" onclick="startGoogleLogin()">
+    <svg viewBox="0 0 24 24" style="width:20px;height:20px"><path fill="#fff" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#fff" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#fff" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#fff" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+    Sign in with Google
+  </button>
+  <div class="setup-error" id="loginError"></div>
+  <div class="setup-status" id="loginStatus"></div>
+</div>
+
+<!-- STEP 2: FAMILY — Create or Join -->
+<div class="fullscreen hidden" id="screenFamily">
+  <h1>&#128106;</h1>
+  <h2>Family Setup</h2>
+  <button class="setup-btn" onclick="goToNewPinScreen()" style="background:rgba(0,0,0,.25)">Create New Star Chart</button>
+  <p style="margin-top:20px">Or join an existing family:</p>
+  <input type="text" id="joinCode" placeholder="CODE" maxlength="6" style="width:220px;padding:12px;border:none;border-radius:10px;font-size:1.2em;text-align:center;letter-spacing:4px;text-transform:uppercase;margin-top:4px">
+  <button class="setup-btn" onclick="joinFamily()" style="margin-top:6px;background:rgba(0,0,0,.25)">Join Family</button>
+  <div class="setup-error" id="familyError"></div>
+</div>
+
+<!-- STEP 3: PIN ENTRY (existing family) -->
+<div class="fullscreen hidden" id="screenPin">
+  <h1>&#128274;</h1>
+  <h2>Enter PIN</h2>
+  <div class="pin-dots" id="pinDots"></div>
+  <div class="pin-pad">
+    <button class="pin-key" onclick="pinPress('1')">1</button>
+    <button class="pin-key" onclick="pinPress('2')">2</button>
+    <button class="pin-key" onclick="pinPress('3')">3</button>
+    <button class="pin-key" onclick="pinPress('4')">4</button>
+    <button class="pin-key" onclick="pinPress('5')">5</button>
+    <button class="pin-key" onclick="pinPress('6')">6</button>
+    <button class="pin-key" onclick="pinPress('7')">7</button>
+    <button class="pin-key" onclick="pinPress('8')">8</button>
+    <button class="pin-key" onclick="pinPress('9')">9</button>
+    <button class="pin-key empty"></button>
+    <button class="pin-key" onclick="pinPress('0')">0</button>
+    <button class="pin-key" onclick="pinBackspace()">&#9003;</button>
+  </div>
+  <div class="setup-error" id="pinError"></div>
+  <div class="setup-status" id="pinStatus"></div>
+  <button class="setup-btn" onclick="forgetFamily()" style="margin-top:24px;background:transparent;font-size:.8em;font-weight:400;opacity:.7;width:auto;padding:8px 16px">Forget Family Link</button>
+</div>
+
+<!-- STEP 3b: CREATE PIN (new family) -->
+<div class="fullscreen hidden" id="screenNewPin">
+  <h1>&#128274;</h1>
+  <h2 id="newPinTitle">Choose a 6-digit PIN</h2>
+  <div class="pin-dots" id="newPinDots"></div>
+  <div class="pin-pad">
+    <button class="pin-key" onclick="newPinPress('1')">1</button>
+    <button class="pin-key" onclick="newPinPress('2')">2</button>
+    <button class="pin-key" onclick="newPinPress('3')">3</button>
+    <button class="pin-key" onclick="newPinPress('4')">4</button>
+    <button class="pin-key" onclick="newPinPress('5')">5</button>
+    <button class="pin-key" onclick="newPinPress('6')">6</button>
+    <button class="pin-key" onclick="newPinPress('7')">7</button>
+    <button class="pin-key" onclick="newPinPress('8')">8</button>
+    <button class="pin-key" onclick="newPinPress('9')">9</button>
+    <button class="pin-key empty"></button>
+    <button class="pin-key" onclick="newPinPress('0')">0</button>
+    <button class="pin-key" onclick="newPinBackspace()">&#9003;</button>
+  </div>
+  <div class="setup-error" id="newPinError"></div>
+</div>
+
+<!-- APP -->
+<div id="appContainer" style="display:none;height:100%;flex-direction:column">
+<div class="topbar">
+  <div class="topbar-title">&#11088; Star Chart</div>
+  <div class="topbar-actions">
+    <button onclick="openAddTask()" title="Add Task">+</button>
+    <button onclick="openSync()" title="Sync"><span class="sync-dot grey" id="syncDot"></span>&#9729;&#65039;</button>
+    <button onclick="openReport()" title="Report">&#128202;</button>
+    <button onclick="openHistory()" title="History">&#128336;</button>
+    <button onclick="openAdmin()" title="Admin">&#128272;</button>
+  </div>
+</div>
+<div class="header">
+  <div class="stars" id="starCount">&#11088; 0</div>
+  <div class="status" id="statusMsg">Finish chores first!</div>
+</div>
+<div class="main" id="mainContent"></div>
+<div class="bottom-bar">
+  <button class="money-btn" onclick="openMoney()">&#128176; Get Money</button>
+</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- MODALS -->
+<div class="overlay" id="addTaskOverlay"><div class="modal"><button class="modal-close" onclick="closeOverlay('addTaskOverlay')">&times;</button><h2>Add Task</h2><label>Task Name</label><input type="text" id="newTaskName" placeholder="e.g. Feed the dog"><label>Emoji</label><div class="emoji-picker" id="emojiPicker"></div><label>Points (0 = mandatory)</label><input type="number" id="newTaskPoints" value="2" min="0" max="10"><div class="toggle-row"><span>Mandatory (Must Do)</span><div class="toggle" id="newTaskMandatory" onclick="toggleMandatory()"></div></div><button class="btn btn-orange" onclick="addTask()">Add Task</button></div></div>
+<div class="overlay" id="reportOverlay"><div class="modal"><button class="modal-close" onclick="closeOverlay('reportOverlay')">&times;</button><h2>&#128202; Today's Report</h2><div id="reportContent"></div></div></div>
+<div class="overlay" id="historyOverlay"><div class="modal"><button class="modal-close" onclick="closeOverlay('historyOverlay')">&times;</button><h2>&#128336; History</h2><div id="historyContent"></div></div></div>
+<div class="overlay" id="historyDetailOverlay"><div class="modal"><button class="modal-close" onclick="closeOverlay('historyDetailOverlay')">&times;</button><h2 id="historyDetailTitle">Day Detail</h2><div id="historyDetailContent"></div></div></div>
+<div class="overlay" id="moneyOverlay"><div class="modal"><button class="modal-close" onclick="closeOverlay('moneyOverlay')">&times;</button><h2>&#128176; Get Money</h2><div id="moneyContent"></div></div></div>
+<div class="overlay" id="adminOverlay"><div class="modal"><button class="modal-close" onclick="closeOverlay('adminOverlay')">&times;</button><h2>&#128272; Admin</h2><div id="adminContent"></div></div></div>
+<div class="overlay" id="syncOverlay"><div class="modal"><button class="modal-close" onclick="closeOverlay('syncOverlay')">&times;</button><h2>&#9729;&#65039; Cloud Sync</h2><div id="syncContent"></div></div></div>
+
+<script>
+/* ===== FIREBASE CONFIG ===== */
+var firebaseConfig={
+  apiKey:"AIzaSyAsiCyTlNsTTrsCcdR240gkx_4N10q_86E",
+  authDomain:"starchart-373cd.firebaseapp.com",
+  projectId:"starchart-373cd",
+  storageBucket:"starchart-373cd.firebasestorage.app",
+  messagingSenderId:"685345253912",
+  appId:"1:685345253912:web:69a8e0b2b6ea0ca540f16d"
+};
+firebase.initializeApp(firebaseConfig);
+var auth=firebase.auth();
+var db=firebase.firestore();
+
+var PIN_LENGTH=6;
+var familyCode=null;
+var currentPin=null;
+var gUserInfo=null;
+var isSyncing=false;
+var syncTimer=null;
+var unsubFirestore=null;
+var bgSyncInterval=null;
+var skipNextSnapshot=false;
+var localChanges={};  /* maps taskId → timestamp of local change */
+
+var DEFAULT_TASKS=[
+  {id:'brush',name:'Brush teeth',emoji:'\uD83E\uDDB7',points:0,mandatory:true},
+  {id:'dress',name:'Get dressed',emoji:'\uD83D\uDC55',points:0,mandatory:true},
+  {id:'shoes',name:'Put shoes away',emoji:'\uD83D\uDC5F',points:0,mandatory:true},
+  {id:'toys',name:'Clean up toys',emoji:'\uD83E\uDDF8',points:2,mandatory:false},
+  {id:'table',name:'Set the table',emoji:'\uD83C\uDF7D\uFE0F',points:2,mandatory:false},
+  {id:'store',name:'Help at store',emoji:'\uD83D\uDED2',points:3,mandatory:false},
+  {id:'car',name:'Prep the car',emoji:'\uD83D\uDE97',points:2,mandatory:false},
+  {id:'laundry',name:'Fold laundry',emoji:'\uD83E\uDDFA',points:3,mandatory:false},
+  {id:'plants',name:'Water plants',emoji:'\uD83E\uDEB4',points:2,mandatory:false},
+  {id:'bed',name:'Make the bed',emoji:'\uD83D\uDECF\uFE0F',points:2,mandatory:false},
+  {id:'fix',name:'Fix stuff',emoji:'\uD83D\uDEE0\uFE0F',points:3,mandatory:false},
+  {id:'garden',name:'Gardening',emoji:'\uD83C\uDF37',points:3,mandatory:false}
+];
+var EMOJIS=['\uD83C\uDF1F','\uD83E\uDDF9','\uD83D\uDED2','\uD83D\uDE97','\uD83E\uDDFA','\uD83C\uDF31','\uD83D\uDC36','\uD83D\uDECF\uFE0F','\uD83D\uDC5F','\uD83C\uDF7D\uFE0F','\uD83D\uDCDA','\uD83C\uDFC0','\uD83C\uDFA8','\uD83C\uDFB5','\uD83D\uDEB4','\uD83E\uDDFB'];
+var selectedEmoji=EMOJIS[0];
+
+function today(){return new Date().toISOString().slice(0,10);}
+function lsGet(k,d){try{var v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}}
+function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+
+function getDeletedTaskIds(){return lsGet('sc_deleted_tasks',[]);}
+function saveDeletedTaskIds(d){lsSet('sc_deleted_tasks',d);scheduleSync();}
+function getAllTasks(){
+  var t=lsGet('sc_tasks',DEFAULT_TASKS);
+  var ids={};for(var i=0;i<t.length;i++)ids[t[i].id]=1;
+  var added=false;for(var i=0;i<DEFAULT_TASKS.length;i++){if(!ids[DEFAULT_TASKS[i].id]){t.push(DEFAULT_TASKS[i]);added=true;}}
+  if(!localStorage.getItem('sc_emoji_v2')){
+    var defById={};for(var i=0;i<DEFAULT_TASKS.length;i++)defById[DEFAULT_TASKS[i].id]=DEFAULT_TASKS[i];
+    for(var i=0;i<t.length;i++){if(defById[t[i].id])t[i].emoji=defById[t[i].id].emoji;}
+    localStorage.setItem('sc_emoji_v2','1');added=true;
+  }
+  if(added)lsSet('sc_tasks',t);
+  return t;
+}
+function getTasks(){
+  var all=getAllTasks(),del=getDeletedTaskIds(),dm={};
+  for(var i=0;i<del.length;i++)dm[del[i]]=1;
+  var out=[];for(var i=0;i<all.length;i++)if(!dm[all[i].id])out.push(all[i]);
+  return out;
+}
+function saveTasks(t){lsSet('sc_tasks',t);scheduleSync();}
+function deleteTask(id){var del=getDeletedTaskIds();if(del.indexOf(id)===-1){del.push(id);saveDeletedTaskIds(del);}render();showAdminPanel();showToast('Task deleted!');}
+function restoreTask(id){var del=getDeletedTaskIds();var nd=[];for(var i=0;i<del.length;i++)if(del[i]!==id)nd.push(del[i]);saveDeletedTaskIds(nd);render();showAdminPanel();showToast('Task restored!');}
+function getDayData(d){return lsGet('sc_day_'+d,{});}
+function setDayData(d,v){lsSet('sc_day_'+d,v);scheduleSync();}
+function getWithdrawals(){return lsGet('sc_withdrawals',[]);}
+function saveWithdrawals(w){lsSet('sc_withdrawals',w);scheduleSync();}
+function getAllDayKeys(){var k=[];for(var i=0;i<localStorage.length;i++){var x=localStorage.key(i);if(x&&x.indexOf('sc_day_')===0)k.push(x.replace('sc_day_',''));}k.sort();return k;}
+function getTotalEarned(){var k=getAllDayKeys(),t=0;for(var i=0;i<k.length;i++){var dd=getDayData(k[i]),tasks=getTasks();for(var j=0;j<tasks.length;j++)if(dd[tasks[j].id]&&!tasks[j].mandatory)t+=tasks[j].points;}return t;}
+function getTotalWithdrawn(){var w=getWithdrawals(),t=0;for(var i=0;i<w.length;i++)t+=w[i].points;return t;}
+function getDayPoints(d){var dd=getDayData(d),tasks=getTasks(),p=0;for(var i=0;i<tasks.length;i++)if(dd[tasks[i].id]&&!tasks[i].mandatory)p+=tasks[i].points;return p;}
+
+/* ===== ENCRYPTION ===== */
+function b64E(buf){return btoa(String.fromCharCode.apply(null,new Uint8Array(buf)));}
+function b64D(s){var b=atob(s),a=new Uint8Array(b.length);for(var i=0;i<b.length;i++)a[i]=b.charCodeAt(i);return a;}
+function deriveKey(pin,salt){var e=new TextEncoder();return crypto.subtle.importKey('raw',e.encode(pin),'PBKDF2',false,['deriveKey']).then(function(k){return crypto.subtle.deriveKey({name:'PBKDF2',salt:salt,iterations:100000,hash:'SHA-256'},k,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);});}
+function encryptData(data,pin){var s=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12)),e=new TextEncoder();return deriveKey(pin,s).then(function(k){return crypto.subtle.encrypt({name:'AES-GCM',iv:iv},k,e.encode(JSON.stringify(data)));}).then(function(ct){return{encrypted:true,v:1,salt:b64E(s),iv:b64E(iv),data:b64E(ct)};});}
+function decryptData(p,pin){var s=b64D(p.salt),iv=b64D(p.iv),ct=b64D(p.data);return deriveKey(pin,s).then(function(k){return crypto.subtle.decrypt({name:'AES-GCM',iv:iv},k,ct);}).then(function(pt){return JSON.parse(new TextDecoder().decode(pt));});}
+
+/* ===== SCREENS ===== */
+function showScreen(id){document.querySelectorAll('.fullscreen').forEach(function(s){s.classList.add('hidden');});document.getElementById(id).classList.remove('hidden');}
+
+/* ===== GOOGLE AUTH via Firebase ===== */
+var isAndroidApp=typeof Android!=='undefined'&&Android.signInWithGoogle;
+if(isAndroidApp)document.body.classList.add('app-toppad');
+
+function startGoogleLogin(){
+  document.getElementById('loginStatus').textContent='Signing in...';
+  document.getElementById('loginError').textContent='';
+  if(isAndroidApp){
+    Android.signInWithGoogle();
+  } else {
+    var provider=new firebase.auth.GoogleAuthProvider();
+    auth.signInWithPopup(provider).catch(function(err){
+      console.error(err);
+      document.getElementById('loginStatus').textContent='';
+      document.getElementById('loginError').textContent=err.message||'Sign-in failed';
+    });
+  }
+}
+
+/* Called by Android native sign-in */
+function nativeSignInWithToken(idToken){
+  var credential=firebase.auth.GoogleAuthProvider.credential(idToken);
+  auth.signInWithCredential(credential).catch(function(err){
+    console.error(err);
+    document.getElementById('loginStatus').textContent='';
+    document.getElementById('loginError').textContent=err.message||'Sign-in failed';
+  });
+}
+function nativeSignInFailed(msg){
+  document.getElementById('loginStatus').textContent='';
+  document.getElementById('loginError').textContent=msg;
+}
+
+auth.onAuthStateChanged(function(user){
+  /* hide the loading splash on first auth check */
+  var ld=document.getElementById('screenLoading');
+  if(ld)ld.classList.add('hidden');
+  if(user){
+    gUserInfo={name:user.displayName,email:user.email,picture:user.photoURL};
+    var savedCode=localStorage.getItem('sc_family_code');
+    if(savedCode){
+      familyCode=savedCode;
+      goToPinScreen();
+    } else {
+      showScreen('screenFamily');
+      document.getElementById('familyError').textContent='';
+    }
+  } else {
+    showScreen('screenLogin');
+  }
+});
+
+/* ===== FAMILY CODE ===== */
+function generateCode(){var c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789',r='';for(var i=0;i<6;i++)r+=c[Math.floor(Math.random()*c.length)];return r;}
+
+function joinFamily(){
+  var code=document.getElementById('joinCode').value.trim().toUpperCase();
+  if(!code||code.length<4){document.getElementById('familyError').textContent='Enter the family code';return;}
+  document.getElementById('familyError').textContent='Checking...';
+  db.collection('families').doc(code).get().then(function(doc){
+    if(doc.exists){
+      familyCode=code;
+      localStorage.setItem('sc_family_code',code);
+      goToPinScreen();
+    } else {
+      document.getElementById('familyError').textContent='Family not found. Check the code.';
+    }
+  }).catch(function(err){
+    console.error(err);
+    document.getElementById('familyError').textContent='Error: '+(err.message||'Could not connect');
+  });
+}
+
+/* ===== PIN: unlock existing family ===== */
+var pinEntry='';
+
+function goToPinScreen(){pinEntry='';showScreen('screenPin');renderDots('pinDots',pinEntry);document.getElementById('pinError').textContent='';document.getElementById('pinStatus').textContent='';}
+function renderDots(id,val){var h='';for(var i=0;i<PIN_LENGTH;i++)h+='<div class="pin-dot'+(i<val.length?' filled':'')+'"></div>';document.getElementById(id).innerHTML=h;}
+function pinPress(d){if(pinEntry.length>=PIN_LENGTH)return;pinEntry+=d;renderDots('pinDots',pinEntry);if(pinEntry.length===PIN_LENGTH)setTimeout(submitPin,200);}
+function pinBackspace(){if(pinEntry.length>0){pinEntry=pinEntry.slice(0,-1);renderDots('pinDots',pinEntry);}}
+
+function submitPin(){
+  document.getElementById('pinError').textContent='';
+  document.getElementById('pinStatus').textContent='Decrypting...';
+  db.collection('families').doc(familyCode).get().then(function(doc){
+    if(!doc.exists){
+      pinEntry='';renderDots('pinDots',pinEntry);
+      document.getElementById('pinError').textContent='Family not found';
+      document.getElementById('pinStatus').textContent='';
+      return;
+    }
+    var payload=doc.data();
+    if(payload&&payload.encrypted){
+      return decryptData(payload,pinEntry).then(function(data){
+        currentPin=pinEntry;
+        importAllData(data);
+        unlockApp();
+      }).catch(function(){
+        pinEntry='';renderDots('pinDots',pinEntry);
+        document.getElementById('pinError').textContent='Wrong PIN';
+        document.getElementById('pinStatus').textContent='';
+      });
+    } else {
+      pinEntry='';renderDots('pinDots',pinEntry);
+      document.getElementById('pinError').textContent='Invalid data';
+      document.getElementById('pinStatus').textContent='';
+    }
+  }).catch(function(err){
+    console.error(err);
+    pinEntry='';renderDots('pinDots',pinEntry);
+    document.getElementById('pinError').textContent='Error reading data';
+    document.getElementById('pinStatus').textContent='';
+  });
+}
+
+/* ===== PIN: create new family ===== */
+var newPinEntry='',newPinFirst='',newPinPhase='choose';
+
+function goToNewPinScreen(){newPinEntry='';newPinFirst='';newPinPhase='choose';document.getElementById('newPinTitle').textContent='Choose a 6-digit PIN';document.getElementById('newPinError').textContent='';showScreen('screenNewPin');renderDots('newPinDots',newPinEntry);}
+function newPinPress(d){if(newPinEntry.length>=PIN_LENGTH)return;newPinEntry+=d;renderDots('newPinDots',newPinEntry);if(newPinEntry.length===PIN_LENGTH)setTimeout(submitNewPin,200);}
+function newPinBackspace(){if(newPinEntry.length>0){newPinEntry=newPinEntry.slice(0,-1);renderDots('newPinDots',newPinEntry);}}
+
+function submitNewPin(){
+  if(newPinPhase==='choose'){
+    newPinFirst=newPinEntry;newPinEntry='';newPinPhase='confirm';
+    document.getElementById('newPinTitle').textContent='Confirm PIN';
+    document.getElementById('newPinError').textContent='';
+    renderDots('newPinDots',newPinEntry);
+  } else {
+    if(newPinEntry!==newPinFirst){
+      document.getElementById('newPinError').textContent="PINs don't match. Try again.";
+      newPinEntry='';newPinFirst='';newPinPhase='choose';
+      document.getElementById('newPinTitle').textContent='Choose a 6-digit PIN';
+      renderDots('newPinDots',newPinEntry);return;
+    }
+    currentPin=newPinEntry;
+    document.getElementById('newPinError').textContent='';
+    document.getElementById('newPinTitle').textContent='Creating...';
+    familyCode=generateCode();
+    var data=exportAllData();
+    encryptData(data,currentPin).then(function(enc){
+      enc.createdBy=(gUserInfo&&gUserInfo.email)||'';
+      enc.createdAt=firebase.firestore.FieldValue.serverTimestamp();
+      return db.collection('families').doc(familyCode).set(enc);
+    }).then(function(){
+      localStorage.setItem('sc_family_code',familyCode);
+      unlockApp();
+    }).catch(function(err){
+      console.error(err);document.getElementById('newPinError').textContent='Failed to create: '+(err.message||'');
+      document.getElementById('newPinTitle').textContent='Choose a 6-digit PIN';
+      newPinEntry='';newPinFirst='';newPinPhase='choose';renderDots('newPinDots',newPinEntry);currentPin=null;familyCode=null;
+    });
+  }
+}
+
+/* ===== UNLOCK ===== */
+function unlockApp(){
+  document.querySelectorAll('.fullscreen').forEach(function(s){s.classList.add('hidden');});
+  var ac=document.getElementById('appContainer');
+  ac.style.display='flex';
+  /* In Android WebView, native padding handles insets and 100% height is correct.
+     In regular browsers, use window.innerHeight to avoid browser chrome overlap. */
+  if(typeof Android==='undefined'){
+    function setVH(){ac.style.height=window.innerHeight+'px';}
+    setVH();
+    window.addEventListener('resize',setVH);
+  }
+  lsSet('sc_lastDay',today());render();setSyncDot('green');startRealtimeSync();
+}
+
+/* ===== DATA EXPORT/IMPORT ===== */
+function exportAllData(){var d={};for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&k.indexOf('sc_')===0)d[k]=localStorage.getItem(k);}d._savedAt=new Date().toISOString();d._savedBy=(gUserInfo&&gUserInfo.email)||'';return d;}
+function importAllData(data){for(var k in data){if(k.charAt(0)==='_')continue;localStorage.setItem(k,data[k]);}}
+function mergeFromRemote(rd){
+  var changed=false;
+  for(var k in rd){
+    if(k.charAt(0)==='_')continue;
+    if(k==='sc_tasks'){var lt=getAllTasks(),rt=[];try{rt=JSON.parse(rd[k]);}catch(e){}var ids={};for(var i=0;i<lt.length;i++)ids[lt[i].id]=1;var added=false;for(var i=0;i<rt.length;i++)if(!ids[rt[i].id]){lt.push(rt[i]);added=true;}if(added){localStorage.setItem(k,JSON.stringify(lt));changed=true;}}
+    else if(k==='sc_deleted_tasks'){/* local is authoritative */}
+    else if(k==='sc_withdrawals'){var lw=getWithdrawals(),rw=[];try{rw=JSON.parse(rd[k]);}catch(e){}var tm={};for(var i=0;i<lw.length;i++)tm[lw[i].timestamp]=lw[i];var wc=Object.keys(tm).length;for(var i=0;i<rw.length;i++)if(!tm[rw[i].timestamp])tm[rw[i].timestamp]=rw[i];if(Object.keys(tm).length>wc){var mg=[];for(var t in tm)mg.push(tm[t]);mg.sort(function(a,b){return(a.timestamp||0)-(b.timestamp||0);});localStorage.setItem(k,JSON.stringify(mg));changed=true;}}
+    else if(k.indexOf('sc_day_')===0){var ld={};try{ld=JSON.parse(localStorage.getItem(k)||'{}');}catch(e){}var rdd={};try{rdd=JSON.parse(rd[k]);}catch(e){}var merged={};var now=Date.now();for(var tid in ld)merged[tid]=ld[tid];for(var tid in rdd){var lct=localChanges[tid];if(!lct||now-lct>5000)merged[tid]=rdd[tid];}var ms=JSON.stringify(merged),ls=localStorage.getItem(k)||'{}';if(ms!==ls){localStorage.setItem(k,ms);changed=true;}}
+    else{if(!localStorage.getItem(k)){localStorage.setItem(k,rd[k]);changed=true;}}
+  }
+  return changed;
+}
+
+/* ===== SYNC via Firestore ===== */
+function setSyncDot(c){var d=document.getElementById('syncDot');if(d)d.className='sync-dot '+c;}
+
+function pullEncrypted(){
+  if(!currentPin||!familyCode)return Promise.resolve();
+  return db.collection('families').doc(familyCode).get().then(function(doc){
+    if(!doc.exists||!currentPin)return;
+    var payload=doc.data();
+    if(payload&&payload.encrypted){
+      return decryptData(payload,currentPin).then(function(data){
+        if(mergeFromRemote(data))render();
+      });
+    }
+  });
+}
+
+function startRealtimeSync(){
+  if(unsubFirestore)unsubFirestore();
+  if(bgSyncInterval)clearInterval(bgSyncInterval);
+  unsubFirestore=db.collection('families').doc(familyCode).onSnapshot(function(doc){
+    if(skipNextSnapshot){skipNextSnapshot=false;return;}
+    if(!doc.exists||!currentPin)return;
+    var payload=doc.data();
+    if(payload&&payload.encrypted){
+      setSyncDot('yellow spin');
+      decryptData(payload,currentPin).then(function(data){
+        if(mergeFromRemote(data))render();
+        setSyncDot('green');
+        localStorage.setItem('sc_last_sync',new Date().toLocaleString());
+      }).catch(function(){setSyncDot('red');});
+    }
+  },function(err){console.error(err);setSyncDot('red');});
+  bgSyncInterval=setInterval(function(){
+    if(!currentPin||!familyCode||syncRunning)return;
+    db.collection('families').doc(familyCode).get().then(function(doc){
+      if(!doc.exists||!currentPin)return;
+      var payload=doc.data();
+      if(payload&&payload.encrypted){
+        decryptData(payload,currentPin).then(function(data){
+          if(mergeFromRemote(data))render();
+          setSyncDot('green');
+          localStorage.setItem('sc_last_sync',new Date().toLocaleString());
+        }).catch(function(){});
+      }
+    }).catch(function(){});
+  },30000);
+}
+
+function pauseAutoSync(){if(unsubFirestore){unsubFirestore();unsubFirestore=null;}if(bgSyncInterval){clearInterval(bgSyncInterval);bgSyncInterval=null;}}
+function resumeAutoSync(){if(currentPin&&familyCode)startRealtimeSync();}
+var syncRunning=false;
+var syncPending=false;
+function doPullPush(){
+  if(!currentPin||!familyCode)return Promise.resolve();
+  if(syncRunning){syncPending=true;return Promise.resolve();}
+  syncRunning=true;setSyncDot('yellow spin');
+  return pullEncrypted().then(function(){
+    return encryptData(exportAllData(),currentPin);
+  }).then(function(enc){
+    enc.updatedBy=(gUserInfo&&gUserInfo.email)||'';
+    enc.updatedAt=firebase.firestore.FieldValue.serverTimestamp();
+    skipNextSnapshot=true;
+    return db.collection('families').doc(familyCode).update(enc);
+  }).then(function(){
+    var now=Date.now();for(var ck in localChanges){if(now-localChanges[ck]>5000)delete localChanges[ck];}setSyncDot('green');localStorage.setItem('sc_last_sync',new Date().toLocaleString());
+    syncRunning=false;
+    if(syncPending){syncPending=false;return doPullPush();}
+    else{resumeAutoSync();}
+  }).catch(function(e){console.error(e);setSyncDot('red');syncRunning=false;
+    if(syncPending){syncPending=false;setTimeout(function(){doPullPush();},1000);}
+    else{resumeAutoSync();}
+  });
+}
+function scheduleSync(){
+  if(!currentPin||!familyCode)return;
+  pauseAutoSync();
+  if(syncTimer)clearTimeout(syncTimer);
+  syncTimer=setTimeout(function(){doPullPush();},800);
+}
+function pushEncrypted(){return doPullPush();}
+
+/* ===== RENDER ===== */
+function renderStars(n,size){
+  if(n<=0)return '';
+  var sz=size||'1em';
+  var h='<span class="star-row" data-stars="'+n+'">';
+  for(var i=0;i<n;i++)h+='<span style="font-size:'+sz+'">\u2B50</span>';
+  h+='</span>';return h;
+}
+/* post-render: shrink star rows that overflow their container */
+function fixStarOverlap(){
+  var rows=document.querySelectorAll('.star-row');
+  for(var r=0;r<rows.length;r++){
+    var row=rows[r],parent=row.parentElement;
+    if(!parent)continue;
+    var stars=row.querySelectorAll('span');
+    var n=stars.length;
+    if(n<2)continue;
+    /* reset margins first */
+    for(var i=0;i<n;i++)stars[i].style.marginRight='0';
+    var availW=parent.clientWidth;
+    var rowW=row.scrollWidth;
+    if(rowW>availW&&n>1){
+      var starW=stars[0].offsetWidth;
+      var excess=rowW-availW;
+      var mr=-(excess/(n-1));
+      mr=Math.max(mr,-starW*0.6);
+      for(var i=0;i<n-1;i++)stars[i].style.marginRight=mr+'px';
+    }
+  }
+}
+
+function sizeCards(){
+  var main=document.getElementById('mainContent');
+  if(!main)return;
+  var grids=main.querySelectorAll('.grid');
+  if(grids.length<2)return;
+
+  var vw=main.clientWidth;
+  /* minimum 3 columns; space-evenly creates (cols+1) equal gaps */
+  var minCols=3;
+  var gap=Math.max(4,Math.round(vw*0.015));
+  /* reserve space for (cols+1) gaps used by space-evenly */
+  var cardSize=Math.floor((vw-gap*(minCols+1))/minCols);
+
+  /* on wider screens (tablets), fit more columns */
+  if(vw>500){
+    var tryC=Math.floor(vw/(cardSize+gap));
+    if(tryC>minCols){minCols=tryC;cardSize=Math.floor((vw-gap*(minCols+1))/minCols);}
+  }
+
+  cardSize=Math.max(cardSize,40);
+  cardSize=Math.min(cardSize,180);
+
+  main.style.setProperty('--card-size',cardSize+'px');
+  main.style.setProperty('--grid-gap',gap+'px');
+
+  /* scale font sizes proportional to card size */
+  var emojiFz=Math.round(cardSize*0.30)+'px';
+  var labelFz=Math.max(7,Math.round(cardSize*0.13))+'px';
+  var ptsFz=Math.max(6,Math.round(cardSize*0.10))+'px';
+  var allCards=main.querySelectorAll('.card');
+  for(var i=0;i<allCards.length;i++){
+    var e=allCards[i].querySelector('.emoji');if(e)e.style.fontSize=emojiFz;
+    var l=allCards[i].querySelector('.label');if(l)l.style.fontSize=labelFz;
+    var p=allCards[i].querySelector('.pts');if(p)p.style.fontSize=ptsFz;
+  }
+}
+
+function render(){
+  var tasks=getTasks(),d=today(),dd=getDayData(d),m=[],o=[];
+  for(var i=0;i<tasks.length;i++){if(tasks[i].mandatory)m.push(tasks[i]);else o.push(tasks[i]);}
+  var am=true;for(var i=0;i<m.length;i++)if(!dd[m[i].id])am=false;
+  var pts=0;for(var i=0;i<o.length;i++)if(dd[o[i].id])pts+=o[i].points;
+  document.getElementById('starCount').innerHTML=pts>0?renderStars(pts,'1.4em'):'<span style="opacity:.4">\u2B50</span>';
+  var co=0;for(var i=0;i<o.length;i++)if(dd[o[i].id])co++;
+  document.getElementById('statusMsg').textContent=!am?'Finish chores first!':co===o.length?'All chores done! \uD83C\uDF89':'Keep going! You can earn more \u2B50';
+  var h='<div class="section-title">\uD83D\uDCAA Must Do</div><div class="grid">';
+  for(var i=0;i<m.length;i++){var t=m[i],dn=!!dd[t.id];h+='<div class="card'+(dn?' done':' mandatory-bg')+'" onclick="tap(\''+t.id+'\')" id="card-'+t.id+'">';if(dn)h+='<span class="check">\u2705</span>';h+='<span class="emoji">'+t.emoji+'</span><span class="label">'+t.name+'</span></div>';}
+  h+='</div><div class="section-title">\u2B50 Earn Stars</div><div class="grid">';
+  for(var i=0;i<o.length;i++){var t=o[i],dn=!!dd[t.id],lk=!am,c='card optional';if(dn)c+=' done';else if(lk)c+=' locked';h+='<div class="'+c+'" onclick="tap(\''+t.id+'\')" id="card-'+t.id+'">';if(dn)h+='<span class="check">\u2705</span>';else if(lk)h+='<span class="lock">\uD83D\uDD12</span>';h+='<span class="emoji">'+t.emoji+'</span><span class="label">'+t.name+'</span><span class="pts">'+renderStars(t.points,'.7em')+'</span></div>';}
+  h+='</div>';document.getElementById('mainContent').innerHTML=h;
+  setTimeout(function(){sizeCards();fixStarOverlap();},0);
+}
+window.addEventListener('resize',function(){sizeCards();fixStarOverlap();});
+
+function tap(id){
+  var tasks=getTasks(),d=today(),dd=getDayData(d),task=null;
+  for(var i=0;i<tasks.length;i++)if(tasks[i].id===id)task=tasks[i];if(!task)return;
+  var was=!!dd[id];
+  if(!was&&!task.mandatory){var m=[];for(var i=0;i<tasks.length;i++)if(tasks[i].mandatory)m.push(tasks[i]);var ok=true;for(var i=0;i<m.length;i++)if(!dd[m[i].id])ok=false;if(!ok){showToast('\uD83D\uDD12 Finish the must-do chores first!');return;}}
+  pauseAutoSync();
+  dd[id]=!was;
+  localChanges[id]=Date.now();
+  setDayData(d,dd);
+  if(!task.mandatory&&!was)confetti();
+  render();
+  var el=document.getElementById('card-'+id);if(el){el.classList.remove('bounce');void el.offsetWidth;el.classList.add('bounce');}
+}
+
+var toastTimer=null;
+function showToast(msg){var t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');if(toastTimer)clearTimeout(toastTimer);toastTimer=setTimeout(function(){t.classList.remove('show');},2000);}
+
+function confetti(){var c=['#FF9B35','#FFEE3F','#4CAF50','#E53935','#2196F3','#9C27B0'];for(var i=0;i<20;i++){var e=document.createElement('div');e.className='confetti-piece';e.style.left=Math.random()*100+'vw';e.style.top=(Math.random()*30+10)+'vh';e.style.background=c[Math.floor(Math.random()*c.length)];e.style.width=(Math.random()*6+5)+'px';e.style.height=e.style.width;e.style.animationDuration=(Math.random()*.6+.8)+'s';document.body.appendChild(e);(function(x){setTimeout(function(){if(x.parentNode)x.parentNode.removeChild(x);},1500);})(e);}}
+
+function closeOverlay(id){document.getElementById(id).classList.remove('active');}
+function openOverlay(id){document.getElementById(id).classList.add('active');}
+
+/* ADD TASK */
+function openAddTask(){document.getElementById('newTaskName').value='';document.getElementById('newTaskPoints').value='2';document.getElementById('newTaskMandatory').classList.remove('on');selectedEmoji=EMOJIS[0];renderEmojiPicker();openOverlay('addTaskOverlay');}
+function renderEmojiPicker(){var h='';for(var i=0;i<EMOJIS.length;i++)h+='<span class="'+(EMOJIS[i]===selectedEmoji?'selected':'')+'" onclick="pickEmoji('+i+')">'+EMOJIS[i]+'</span>';document.getElementById('emojiPicker').innerHTML=h;}
+function pickEmoji(i){selectedEmoji=EMOJIS[i];renderEmojiPicker();}
+function toggleMandatory(){var e=document.getElementById('newTaskMandatory');e.classList.toggle('on');if(e.classList.contains('on'))document.getElementById('newTaskPoints').value='0';}
+function addTask(){var n=document.getElementById('newTaskName').value.trim();if(!n){showToast('Enter a task name!');return;}var p=parseInt(document.getElementById('newTaskPoints').value)||0;var m=document.getElementById('newTaskMandatory').classList.contains('on');if(m)p=0;var tasks=getTasks();tasks.push({id:'custom_'+Date.now(),name:n,emoji:selectedEmoji,points:p,mandatory:m});saveTasks(tasks);closeOverlay('addTaskOverlay');render();showToast('Task added!');}
+
+/* REPORT */
+function openReport(){var d=today(),dd=getDayData(d),tasks=getTasks(),pts=getDayPoints(d),done=[];for(var i=0;i<tasks.length;i++)if(dd[tasks[i].id])done.push(tasks[i]);var h='<div class="stat-row"><span class="stat-label">Date</span><span class="stat-value">'+d+'</span></div><div class="stat-row"><span class="stat-label">Stars</span><span class="stat-value">'+renderStars(pts,'1em')+'</span></div><div class="stat-row"><span class="stat-label">Tasks</span><span class="stat-value">'+done.length+'/'+tasks.length+'</span></div><h3 style="margin:12px 0 6px">Completed</h3>';if(!done.length)h+='<p style="color:var(--muted)">None yet</p>';for(var i=0;i<done.length;i++){var t=done[i];h+='<div class="task-item">'+t.emoji+' '+t.name+(t.mandatory?'':' '+renderStars(t.points,'.85em'))+'</div>';}document.getElementById('reportContent').innerHTML=h;openOverlay('reportOverlay');}
+
+/* HISTORY */
+function openHistory(){var k=getAllDayKeys();k.sort().reverse();var h='';if(!k.length)h='<p style="color:var(--muted);text-align:center;padding:20px">No history yet</p>';for(var i=0;i<k.length&&i<30;i++){var dp=getDayPoints(k[i]);h+='<div class="history-item" onclick="showDetail(\''+k[i]+'\')"><span class="history-date">'+k[i]+'</span><span class="history-pts">'+dp+' \u2B50</span></div>';}document.getElementById('historyContent').innerHTML=h;openOverlay('historyOverlay');}
+function showDetail(d){var dd=getDayData(d),tasks=getTasks(),pts=getDayPoints(d),done=[];document.getElementById('historyDetailTitle').textContent=d;for(var i=0;i<tasks.length;i++)if(dd[tasks[i].id])done.push(tasks[i]);var h='<div class="stat-row"><span class="stat-label">Stars</span><span class="stat-value">'+pts+' \u2B50</span></div><div class="stat-row"><span class="stat-label">Tasks</span><span class="stat-value">'+done.length+'</span></div><h3 style="margin:12px 0 6px">Completed</h3>';for(var i=0;i<done.length;i++){var t=done[i];h+='<div class="task-item">'+t.emoji+' '+t.name+(t.mandatory?'':' '+t.points+' \u2B50')+'</div>';}document.getElementById('historyDetailContent').innerHTML=h;openOverlay('historyDetailOverlay');}
+
+/* MONEY */
+function openMoney(){var e=getTotalEarned(),w=getTotalWithdrawn(),b=e-w,eu=(b/10).toFixed(2),ws=getWithdrawals();var h='<div style="text-align:center;padding:10px 0"><div style="font-weight:800;font-size:1.8em">'+b+' \u2B50</div><div style="font-size:1.1em;color:var(--muted);margin:4px 0">Available</div><div style="font-size:1.8em;font-weight:700;color:var(--green);margin:8px 0">\u20AC'+eu+'</div><div style="font-size:.85em;color:var(--muted)">10 pts = \u20AC1</div></div>';if(b>0)h+='<button class="btn btn-green" onclick="cashOut()" style="margin:12px 0">\uD83D\uDCB0 Cash out! (\u20AC'+eu+')</button>';if(ws.length){h+='<h3 style="margin:12px 0 6px">Withdrawals</h3>';for(var i=ws.length-1;i>=0;i--)h+='<div class="withdrawal-item"><strong>\u20AC'+(ws[i].points/10).toFixed(2)+'</strong> ('+ws[i].points+' \u2B50) &mdash; '+ws[i].date+'</div>';}document.getElementById('moneyContent').innerHTML=h;openOverlay('moneyOverlay');}
+function cashOut(){var e=getTotalEarned(),w=getTotalWithdrawn(),b=e-w;if(b<=0)return;var ws=getWithdrawals();ws.push({points:b,euros:(b/10).toFixed(2),date:today(),timestamp:Date.now()});saveWithdrawals(ws);confetti();showToast('\uD83D\uDCB0 Cashed out \u20AC'+(b/10).toFixed(2)+'!');openMoney();}
+
+/* ADMIN */
+function openAdmin(){showAdminPanel();}
+function showAdminPanel(){var e=getTotalEarned(),w=getTotalWithdrawn(),b=e-w,k=getAllDayKeys(),da=k.length,avg=da>0?(e/da).toFixed(1):'0';var str=0,d=new Date();for(var i=0;i<365;i++){if(getDayPoints(d.toISOString().slice(0,10))>0)str++;else if(i>0)break;d.setDate(d.getDate()-1);}var h='<div class="stat-row"><span class="stat-label">Total Earned</span><span class="stat-value">'+e+' \u2B50</span></div><div class="stat-row"><span class="stat-label">Withdrawn</span><span class="stat-value">'+w+' \u2B50 (\u20AC'+(w/10).toFixed(2)+')</span></div><div class="stat-row"><span class="stat-label">Balance</span><span class="stat-value">'+b+' \u2B50 (\u20AC'+(b/10).toFixed(2)+')</span></div><div class="stat-row"><span class="stat-label">Days Active</span><span class="stat-value">'+da+'</span></div><div class="stat-row"><span class="stat-label">Avg/Day</span><span class="stat-value">'+avg+' \u2B50</span></div><div class="stat-row"><span class="stat-label">Streak</span><span class="stat-value">'+str+' days</span></div>';var rc=k.slice(-14);if(rc.length){var mx=1;for(var i=0;i<rc.length;i++){var p=getDayPoints(rc[i]);if(p>mx)mx=p;}h+='<h3 style="margin:14px 0 6px">Last '+rc.length+' days</h3><div class="chart-container">';for(var i=0;i<rc.length;i++){var p=getDayPoints(rc[i]);h+='<div class="chart-bar-row"><span class="chart-date">'+rc[i].slice(5)+'</span><div class="chart-bar" style="width:'+Math.round(p/mx*100)+'%"></div><span class="chart-val">'+p+' \u2B50</span></div>';}h+='</div>';}h+='<h3 style="margin:14px 0 6px">Daily Log</h3>';var lk=k.slice().reverse();for(var i=0;i<lk.length&&i<20;i++){var dp=getDayPoints(lk[i]);h+='<div class="stat-row"><span class="stat-label">'+lk[i]+'</span><span class="stat-value">'+dp+' \u2B50</span></div>';}var ws=getWithdrawals();if(ws.length){h+='<h3 style="margin:14px 0 6px">Withdrawals</h3>';for(var i=ws.length-1;i>=0;i--)h+='<div class="stat-row"><span class="stat-label">'+ws[i].date+'</span><span class="stat-value">'+ws[i].points+' \u2B50 (\u20AC'+(ws[i].points/10).toFixed(2)+')</span></div>';}h+='<h3 style="margin:14px 0 6px">Manage Tasks</h3>';var at=getTasks();for(var i=0;i<at.length;i++){var t=at[i];h+='<div class="stat-row"><span class="stat-label">'+t.emoji+' '+t.name+(t.mandatory?' (must do)':' '+t.points+' \u2B50')+'</span><span class="stat-value"><button onclick="deleteTask(\''+t.id+'\')" style="background:#E53935;color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:.85em;cursor:pointer">\u2716</button></span></div>';}var dids=getDeletedTaskIds();if(dids.length){h+='<h3 style="margin:14px 0 6px">Deleted Tasks</h3>';var allT=getAllTasks(),tidMap={};for(var i=0;i<allT.length;i++)tidMap[allT[i].id]=allT[i];for(var i=0;i<dids.length;i++){var dt=tidMap[dids[i]];if(dt)h+='<div class="stat-row" style="opacity:.6"><span class="stat-label">'+dt.emoji+' '+dt.name+'</span><span class="stat-value"><button onclick="restoreTask(\''+dt.id+'\')" style="background:#4CAF50;color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:.85em;cursor:pointer">\u21A9</button></span></div>';}}document.getElementById('adminContent').innerHTML=h;openOverlay('adminOverlay');}
+
+/* SYNC UI */
+function openSync(){renderSyncUI();openOverlay('syncOverlay');}
+function renderSyncUI(){
+  var h='';
+  if(gUserInfo){h+='<div class="backup-user">';if(gUserInfo.picture)h+='<img src="'+gUserInfo.picture+'" alt="">';h+='<div class="backup-user-info"><div class="backup-user-name">'+(gUserInfo.name||'')+'</div><div class="backup-user-email">'+(gUserInfo.email||'')+'</div></div></div>';}
+  h+='<div class="backup-section"><h3><span class="sync-dot green"></span> Encrypted Real-Time Sync</h3><p class="setup-note">Data encrypted with your PIN. Syncs automatically in real-time across all devices.</p>';
+  var ls=localStorage.getItem('sc_last_sync');if(ls)h+='<p class="backup-info">Last sync: '+ls+'</p>';
+  h+='<button class="btn btn-blue" onclick="forceSyncNow()">Sync Now</button></div>';
+  h+='<div class="backup-section"><h3>Share with Family</h3><p class="setup-note">Share this code with family members. They sign in with Google, enter the code, and use the same PIN.</p>';
+  if(familyCode)h+='<div style="text-align:center;margin:10px 0"><div style="font-size:2em;font-weight:800;letter-spacing:6px;color:var(--dark)">'+familyCode+'</div><p class="setup-note">Family Code</p></div>';
+  h+='</div>';
+  h+='<div class="backup-section"><button class="btn-outline" onclick="resetAll()">Sign Out / Reset</button></div>';
+  document.getElementById('syncContent').innerHTML=h;
+}
+function forceSyncNow(){pushEncrypted().then(function(){renderSyncUI();showToast('Synced!');});}
+function resetAll(){
+  if(unsubFirestore)unsubFirestore();
+  if(bgSyncInterval)clearInterval(bgSyncInterval);
+  auth.signOut();
+  gUserInfo=null;familyCode=null;currentPin=null;
+  localStorage.removeItem('sc_family_code');
+  if(syncTimer)clearTimeout(syncTimer);
+  closeOverlay('syncOverlay');
+  document.getElementById('appContainer').style.display='none';
+  showScreen('screenLogin');
+}
+function forgetFamily(){
+  familyCode=null;currentPin=null;
+  localStorage.removeItem('sc_family_code');
+  if(unsubFirestore)unsubFirestore();
+  if(bgSyncInterval)clearInterval(bgSyncInterval);
+  if(syncTimer)clearTimeout(syncTimer);
+  showScreen('screenFamily');
+  document.getElementById('familyError').textContent='';
+}
+</script>
+</body>
+</html>
