@@ -849,36 +849,44 @@ function loadOwnerActions(){
 function resetFamilyPin(){
   if(!familyCode||!currentPin)return;
   if(!confirm('Reset the family PIN? All members will need to use the new PIN.'))return;
-  var np='',phase='choose';
+  var np='',phase='choose',firstPin='';
+  var old=document.getElementById('pinResetOverlay');if(old)old.remove();
   var div=document.createElement('div');div.className='overlay active';div.id='pinResetOverlay';
+  document.body.appendChild(div);
   function renderResetUI(){
     var dots='';var len=Math.max(np.length,MIN_PIN);for(var i=0;i<len;i++)dots+='<div class="pin-dot'+(i<np.length?' filled':'')+'"></div>';
-    div.innerHTML='<div class="modal"><button class="modal-close" onclick="document.getElementById(\'pinResetOverlay\').remove()">&times;</button><h2>'+(phase==='choose'?'New PIN ('+MIN_PIN+'-'+MAX_PIN+' digits)':'Confirm New PIN')+'</h2><div class="pin-dots">'+dots+'</div><div class="pin-pad" id="resetPinPad"></div><div class="setup-error" id="resetPinError"></div></div>';
-    document.body.appendChild(div);
-    var pad=document.getElementById('resetPinPad');
-    var keys='1234567890';
-    for(var i=0;i<keys.length;i++){(function(k){var b=document.createElement('button');b.className='pin-key';b.textContent=k;b.addEventListener('click',function(){if(np.length>=MAX_PIN)return;np+=k;renderResetUI();});pad.appendChild(b);})(keys[i]);}
-    var confirmBtn=document.createElement('button');confirmBtn.className='pin-key';confirmBtn.innerHTML='&#10003;';confirmBtn.addEventListener('click',doSubmit);
-    var zeroBtn=pad.children[9];pad.insertBefore(confirmBtn,zeroBtn);
-    var bk=document.createElement('button');bk.className='pin-key';bk.innerHTML='&#9003;';bk.addEventListener('click',function(){if(np.length>0){np=np.slice(0,-1);renderResetUI();}});pad.appendChild(bk);
-  }
-  var firstPin='';
-  function doSubmit(){
-    if(np.length<MIN_PIN){document.getElementById('resetPinError').textContent='At least '+MIN_PIN+' digits';return;}
-    if(phase==='choose'){firstPin=np;np='';phase='confirm';renderResetUI();}
-    else{
-      if(np!==firstPin){document.getElementById('resetPinError').textContent="PINs don't match";np='';firstPin='';phase='choose';renderResetUI();return;}
-      var newPin=np;div.remove();
-      var data=exportAllData();
-      currentPin=newPin;
-      encryptData(data,newPin).then(function(enc){
-        enc.updatedBy=(gUserInfo&&gUserInfo.email)||'';
-        enc.updatedAt=firebase.firestore.FieldValue.serverTimestamp();
-        return db.collection('families').doc(familyCode).update(enc);
-      }).then(function(){
-        showToast('PIN changed! Share the new PIN with family members.');
-      }).catch(function(err){showToast('Error: '+(err.message||'Failed'));});
+    var title=phase==='choose'?'New PIN ('+MIN_PIN+'-'+MAX_PIN+' digits)':'Confirm New PIN';
+    var h='<div class="modal"><button class="modal-close" id="resetPinClose">&times;</button><h2>'+title+'</h2><div class="pin-dots">'+dots+'</div><div class="pin-pad">';
+    var keys=['1','2','3','4','5','6','7','8','9','ok','0','del'];
+    for(var i=0;i<keys.length;i++){
+      if(keys[i]==='ok')h+='<button class="pin-key" data-action="submit">&#10003;</button>';
+      else if(keys[i]==='del')h+='<button class="pin-key" data-action="back">&#9003;</button>';
+      else h+='<button class="pin-key" data-digit="'+keys[i]+'">'+keys[i]+'</button>';
     }
+    h+='</div><div class="setup-error" id="resetPinError"></div></div>';
+    div.innerHTML=h;
+    document.getElementById('resetPinClose').addEventListener('click',function(){div.remove();});
+    div.querySelectorAll('[data-digit]').forEach(function(btn){
+      btn.addEventListener('click',function(){if(np.length>=MAX_PIN)return;np+=btn.getAttribute('data-digit');renderResetUI();});
+    });
+    div.querySelector('[data-action="back"]').addEventListener('click',function(){if(np.length>0){np=np.slice(0,-1);renderResetUI();}});
+    div.querySelector('[data-action="submit"]').addEventListener('click',function(){
+      if(np.length<MIN_PIN){document.getElementById('resetPinError').textContent='At least '+MIN_PIN+' digits';return;}
+      if(phase==='choose'){firstPin=np;np='';phase='confirm';renderResetUI();}
+      else{
+        if(np!==firstPin){document.getElementById('resetPinError').textContent="PINs don't match";np='';firstPin='';phase='choose';renderResetUI();return;}
+        var newPin=np;div.remove();
+        var data=exportAllData();
+        currentPin=newPin;
+        encryptData(data,newPin).then(function(enc){
+          enc.updatedBy=(gUserInfo&&gUserInfo.email)||'';
+          enc.updatedAt=firebase.firestore.FieldValue.serverTimestamp();
+          return db.collection('families').doc(familyCode).update(enc);
+        }).then(function(){
+          showToast('PIN changed! Share the new PIN with family members.');
+        }).catch(function(err){showToast('Error: '+(err.message||'Failed'));});
+      }
+    });
   }
   renderResetUI();
 }
