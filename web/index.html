@@ -432,7 +432,7 @@ function submitPin(){
           if(email){
             upd.memberEmails=firebase.firestore.FieldValue.arrayUnion(emailLower);
             upd.pendingMembers=firebase.firestore.FieldValue.arrayRemove(emailLower);
-            var mapKey='memberMap.'+emailLower.replace(/[.\/$\[\]#\/]/g,function(c){return '%'+c.charCodeAt(0).toString(16);});
+            var mapKey='memberMap.'+emailLower.replace(/[.\/$\[\]#]/g,function(c){return '%'+c.charCodeAt(0).toString(16);});
             upd[mapKey]=uid;
           }
           if(!payload.owner&&payload.createdBy&&emailVerified&&emailLower&&payload.createdBy.toLowerCase()===emailLower){upd.owner=uid;}
@@ -823,7 +823,7 @@ function removeMember(email,status){
     } else {
       upd.memberEmails=firebase.firestore.FieldValue.arrayRemove(email);
       upd.pendingMembers=firebase.firestore.FieldValue.arrayRemove(email);
-      var mapKey=email.replace(/[.\/$\[\]#\/]/g,function(c){return '%'+c.charCodeAt(0).toString(16);});
+      var mapKey=email.replace(/[.\/$\[\]#]/g,function(c){return '%'+c.charCodeAt(0).toString(16);});
       var memberMap=d.memberMap||{};
       var uid=memberMap[mapKey];
       if(uid){
@@ -876,13 +876,14 @@ function resetFamilyPin(){
       else{
         if(np!==firstPin){document.getElementById('resetPinError').textContent="PINs don't match";np='';firstPin='';phase='choose';renderResetUI();return;}
         var newPin=np;div.remove();
+        var oldPin=currentPin;
         var data=exportAllData();
-        currentPin=newPin;
         encryptData(data,newPin).then(function(enc){
           enc.updatedBy=(gUserInfo&&gUserInfo.email)||'';
           enc.updatedAt=firebase.firestore.FieldValue.serverTimestamp();
           return db.collection('families').doc(familyCode).update(enc);
         }).then(function(){
+          currentPin=newPin;
           showToast('PIN changed! Share the new PIN with family members.');
         }).catch(function(err){showToast('Error: '+(err.message||'Failed'));});
       }
