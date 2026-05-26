@@ -46,13 +46,14 @@ The encryption key never leaves the device. Firebase stores only the encrypted b
 
 - **Google Sign-In only** — no password storage, no custom auth
 - **Email verification required:** Only verified Google accounts can join as pending members or be recognized as email members
-- **Member-based Firestore rules:**
-  - **Read:** Any authenticated user (family code acts as a knowledge factor)
+- **Invite-first Firestore rules:**
+  - **Read:** Members or invited pending members only — even knowing the family code gives nothing without an invite
   - **Create:** Any authenticated user (must include their own UID)
   - **Update:** Existing members OR invited pending members only
   - **Delete:** Members only
 - **Owner role:** Tracked by UID, auto-assigned to the creator. Owner can reset PINs and remove members
-- **Invitation flow:** Members must be pre-invited by email before they can join. The `pendingMembers` array controls who is allowed to self-add
+- **Invitation flow:** Members must be pre-invited by email before they can join. Without an invite, the family document is completely inaccessible — Firestore rejects the read at the server level
+- **Uniform error messages:** Wrong PIN, not a member, family not found, and permission denied all show the same error — no information leakage about family existence or membership status
 
 ### Member Management
 
