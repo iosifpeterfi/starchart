@@ -410,15 +410,30 @@ function submitPin(){
     }
     var payload=doc.data();
     if(payload&&payload.encrypted){
+      var uid=auth.currentUser&&auth.currentUser.uid;
+      var email=auth.currentUser&&auth.currentUser.email;
+      var emailLower=email?email.toLowerCase():'';
+      var isMember=uid&&(payload.members||[]).indexOf(uid)!==-1;
+      var isPending=emailLower&&(payload.pendingMembers||[]).indexOf(emailLower)!==-1;
+      var isEmailMember=emailLower&&(payload.memberEmails||[]).indexOf(emailLower)!==-1;
+      if(!isMember&&!isPending&&!isEmailMember){
+        pinEntry='';renderDots('pinDots',pinEntry);
+        document.getElementById('pinError').textContent='Access denied — not a member';
+        document.getElementById('pinStatus').textContent='';
+        return;
+      }
       return decryptData(payload,pinEntry).then(function(data){
         currentPin=pinEntry;
         importAllData(data);
-        var uid=auth.currentUser&&auth.currentUser.uid;
-        var email=auth.currentUser&&auth.currentUser.email;
         if(uid){
           var upd={members:firebase.firestore.FieldValue.arrayUnion(uid)};
-          if(email){upd.memberEmails=firebase.firestore.FieldValue.arrayUnion(email.toLowerCase());upd.pendingMembers=firebase.firestore.FieldValue.arrayRemove(email.toLowerCase());}
-          if(!payload.owner&&payload.createdBy&&email&&payload.createdBy.toLowerCase()===email.toLowerCase()){upd.owner=uid;}
+          if(email){
+            upd.memberEmails=firebase.firestore.FieldValue.arrayUnion(emailLower);
+            upd.pendingMembers=firebase.firestore.FieldValue.arrayRemove(emailLower);
+            var mapKey='memberMap.'+emailLower.replace(/\./g,'%2E');
+            upd[mapKey]=uid;
+          }
+          if(!payload.owner&&payload.createdBy&&emailLower&&payload.createdBy.toLowerCase()===emailLower){upd.owner=uid;}
           db.collection('families').doc(familyCode).update(upd).catch(function(){});
         }
         unlockApp();
@@ -792,14 +807,25 @@ function loadMembers(){
 function removeMember(email,status){
   if(!familyCode)return;
   if(!confirm('Remove '+email+' from this family?'))return;
-  var upd={};
-  if(status==='pending'){
-    upd.pendingMembers=firebase.firestore.FieldValue.arrayRemove(email);
-  } else {
-    upd.memberEmails=firebase.firestore.FieldValue.arrayRemove(email);
-    upd.pendingMembers=firebase.firestore.FieldValue.arrayRemove(email);
-  }
-  db.collection('families').doc(familyCode).update(upd).then(function(){
+  db.collection('families').doc(familyCode).get().then(function(doc){
+    if(!doc.exists)return;
+    var d=doc.data();
+    var upd={};
+    if(status==='pending'){
+      upd.pendingMembers=firebase.firestore.FieldValue.arrayRemove(email);
+    } else {
+      upd.memberEmails=firebase.firestore.FieldValue.arrayRemove(email);
+      upd.pendingMembers=firebase.firestore.FieldValue.arrayRemove(email);
+      var mapKey=email.replace(/\./g,'%2E');
+      var memberMap=d.memberMap||{};
+      var uid=memberMap[mapKey];
+      if(uid){
+        upd.members=firebase.firestore.FieldValue.arrayRemove(uid);
+        upd['memberMap.'+mapKey]=firebase.firestore.FieldValue.delete();
+      }
+    }
+    return db.collection('families').doc(familyCode).update(upd);
+  }).then(function(){
     showToast('Removed '+email);loadMembers();
   }).catch(function(err){showToast('Error: '+(err.message||'Failed'));});
 }
