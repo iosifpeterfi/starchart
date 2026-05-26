@@ -414,7 +414,12 @@ function submitPin(){
         currentPin=pinEntry;
         importAllData(data);
         var uid=auth.currentUser&&auth.currentUser.uid;
-        if(uid){db.collection('families').doc(familyCode).update({members:firebase.firestore.FieldValue.arrayUnion(uid)}).catch(function(){});}
+        var email=auth.currentUser&&auth.currentUser.email;
+        if(uid){
+          var upd={members:firebase.firestore.FieldValue.arrayUnion(uid)};
+          if(email)upd.pendingMembers=firebase.firestore.FieldValue.arrayRemove(email.toLowerCase());
+          db.collection('families').doc(familyCode).update(upd).catch(function(){});
+        }
         unlockApp();
       }).catch(function(){
         pinEntry='';renderDots('pinDots',pinEntry);
@@ -463,6 +468,7 @@ function submitNewPin(){
       enc.createdBy=(gUserInfo&&gUserInfo.email)||'';
       enc.createdAt=firebase.firestore.FieldValue.serverTimestamp();
       enc.members=[auth.currentUser.uid];
+      enc.pendingMembers=[];
       return db.collection('families').doc(familyCode).set(enc);
     }).then(function(){
       localStorage.setItem('sc_family_code',familyCode);
@@ -727,10 +733,19 @@ function renderSyncUI(){
   h+='<div class="backup-section"><h3>Share with Family</h3><p class="setup-note">Share this code with family members. They sign in with Google, enter the code, and use the same PIN.</p>';
   if(familyCode)h+='<div style="text-align:center;margin:10px 0"><div style="font-size:1.4em;font-weight:800;letter-spacing:4px;color:var(--dark);word-break:break-all">'+esc(familyCode)+'</div><p class="setup-note">Family Code — share only with trusted family members</p></div>';
   h+='</div>';
+  h+='<div class="backup-section"><h3>Invite Family Member</h3><p class="setup-note">Enter the Google email of the person you want to invite. They must be invited before they can join.</p><input type="text" id="inviteEmail" placeholder="email@gmail.com" style="width:100%;padding:10px;border:2px solid #ddd;border-radius:10px;font-size:.9em;margin:6px 0"><button class="btn btn-orange" onclick="inviteMember()">Invite</button></div>';
   h+='<div class="backup-section"><button class="btn-outline" onclick="resetAll()">Sign Out / Reset</button></div>';
   document.getElementById('syncContent').innerHTML=h;
 }
 function forceSyncNow(){pushEncrypted().then(function(){renderSyncUI();showToast('Synced!');});}
+function inviteMember(){
+  var email=(document.getElementById('inviteEmail').value||'').trim().toLowerCase();
+  if(!email||email.indexOf('@')===-1){showToast('Enter a valid email');return;}
+  if(!familyCode){showToast('No family');return;}
+  db.collection('families').doc(familyCode).update({
+    pendingMembers:firebase.firestore.FieldValue.arrayUnion(email)
+  }).then(function(){showToast('Invited '+email+'!');document.getElementById('inviteEmail').value='';}).catch(function(err){showToast('Error: '+(err.message||'Failed'));});
+}
 function resetAll(){
   if(!confirm('Sign out and erase all local data? This cannot be undone.'))return;
   if(unsubFirestore)unsubFirestore();
