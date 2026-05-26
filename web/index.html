@@ -400,15 +400,32 @@ function renderDots(id,val){var len=Math.max(val.length,MIN_PIN);var h='';for(va
 function pinPress(d){if(pinEntry.length>=MAX_PIN)return;pinEntry+=d;renderDots('pinDots',pinEntry);}
 function pinBackspace(){if(pinEntry.length>0){pinEntry=pinEntry.slice(0,-1);renderDots('pinDots',pinEntry);}}
 
+var pinFailCount=0;var pinLocked=false;var pinLockTimer=null;
+var LOCKOUT_SCHEDULE=[0,0,0,30,60,300,600,1800];
 function pinFail(dotsId,errorId,msg){
   var dots=document.getElementById(dotsId);
   if(dots){dots.classList.add('shake');setTimeout(function(){dots.classList.remove('shake');},500);}
   if(navigator.vibrate)navigator.vibrate([100,50,100]);
-  if(errorId)document.getElementById(errorId).textContent=msg||'Wrong PIN';
+  pinFailCount++;
+  var wait=LOCKOUT_SCHEDULE[Math.min(pinFailCount,LOCKOUT_SCHEDULE.length-1)];
+  if(wait>0){
+    pinLocked=true;
+    var el=document.getElementById(errorId);
+    function tick(){
+      if(wait<=0){pinLocked=false;if(el)el.textContent='Try again';return;}
+      var m=Math.floor(wait/60),s=wait%60;
+      if(el)el.textContent='Too many attempts. Wait '+(m>0?m+'m ':'')+s+'s';
+      wait--;pinLockTimer=setTimeout(tick,1000);
+    }
+    tick();
+  } else {
+    if(errorId)document.getElementById(errorId).textContent=msg||'Wrong PIN';
+  }
   var st=document.getElementById('pinStatus');if(st)st.textContent='';
 }
 
 function submitPin(){
+  if(pinLocked)return;
   if(pinEntry.length<MIN_PIN){document.getElementById('pinError').textContent='PIN must be at least '+MIN_PIN+' digits';return;}
   document.getElementById('pinError').textContent='';
   document.getElementById('pinStatus').textContent='Decrypting...';
@@ -510,6 +527,7 @@ function submitNewPin(){
 
 /* ===== UNLOCK ===== */
 function unlockApp(){
+  pinFailCount=0;if(pinLockTimer){clearTimeout(pinLockTimer);pinLockTimer=null;}pinLocked=false;
   document.querySelectorAll('.fullscreen').forEach(function(s){s.classList.add('hidden');});
   var ac=document.getElementById('appContainer');
   ac.style.display='flex';
