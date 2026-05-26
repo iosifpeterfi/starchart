@@ -753,8 +753,9 @@ function migrateFamily(){
   if(!confirm('Upgrade to new 12-char code?\n\nYour old code will be deleted. All family members must use the new code.\n\nContinue?'))return;
   var oldCode=familyCode;
   var newCode=generateCode();
-  var data=exportAllData();
   familyCode=newCode;
+  localStorage.setItem('sc_family_code',newCode);
+  var data=exportAllData();
   encryptData(data,currentPin).then(function(enc){
     enc.createdBy=(gUserInfo&&gUserInfo.email)||'';
     enc.createdAt=firebase.firestore.FieldValue.serverTimestamp();
@@ -764,7 +765,6 @@ function migrateFamily(){
     enc.pendingMembers=[];
     return db.collection('families').doc(newCode).set(enc);
   }).then(function(){
-    localStorage.setItem('sc_family_code',newCode);
     return db.collection('families').doc(oldCode).delete();
   }).then(function(){
     pauseAutoSync();startRealtimeSync();
@@ -772,6 +772,7 @@ function migrateFamily(){
     showToast('Upgraded! New code: '+newCode);
   }).catch(function(err){
     familyCode=oldCode;
+    localStorage.setItem('sc_family_code',oldCode);
     showToast('Migration failed: '+(err.message||''));
   });
 }
