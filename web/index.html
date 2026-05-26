@@ -392,8 +392,7 @@ function joinFamily(){
     }
   }).catch(function(err){
     console.error(err);
-    var msg=((err.code||'').indexOf('permission')!==-1||(err.message||'').indexOf('ermission')!==-1)?'You must be invited before you can join. Ask a family member to invite your email.':'Error: Could not connect';
-    document.getElementById('familyError').textContent=msg;
+    document.getElementById('familyError').textContent='Family not found. Check the code.';
   });
 }
 
@@ -480,8 +479,7 @@ function submitPin(){
   }).catch(function(err){
     console.error(err);
     pinEntry='';renderDots('pinDots',pinEntry);
-    var isPermErr=((err.code||'').indexOf('permission')!==-1||(err.message||'').indexOf('ermission')!==-1);
-    pinFail('pinDots','pinError',isPermErr?'Access denied':'Error reading data');
+    pinFail('pinDots','pinError','Wrong PIN');
   });
 }
 
