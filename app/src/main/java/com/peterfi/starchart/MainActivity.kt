@@ -72,6 +72,8 @@ class MainActivity : AppCompatActivity() {
             domStorageEnabled = true
             databaseEnabled = true
             cacheMode = WebSettings.LOAD_DEFAULT
+            allowFileAccess = false
+            allowContentAccess = false
             userAgentString = userAgentString + " StarChartApp"
         }
 
