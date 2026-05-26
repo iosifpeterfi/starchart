@@ -138,7 +138,7 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
   <h2>Family Setup</h2>
   <button class="setup-btn" onclick="goToNewPinScreen()" style="background:rgba(0,0,0,.25)">Create New Star Chart</button>
   <p style="margin-top:20px">Or join an existing family:</p>
-  <input type="text" id="joinCode" placeholder="CODE" maxlength="6" style="width:220px;padding:12px;border:none;border-radius:10px;font-size:1.2em;text-align:center;letter-spacing:4px;text-transform:uppercase;margin-top:4px">
+  <input type="text" id="joinCode" placeholder="FAMILY CODE" maxlength="12" style="width:280px;padding:12px;border:none;border-radius:10px;font-size:1em;text-align:center;letter-spacing:3px;text-transform:uppercase;margin-top:4px">
   <button class="setup-btn" onclick="joinFamily()" style="margin-top:6px;background:rgba(0,0,0,.25)">Join Family</button>
   <div class="setup-error" id="familyError"></div>
 </div>
@@ -308,9 +308,11 @@ function getDayPoints(d){var dd=getDayData(d),tasks=getTasks(),p=0;for(var i=0;i
 /* ===== ENCRYPTION ===== */
 function b64E(buf){var u=new Uint8Array(buf),s='';for(var i=0;i<u.length;i+=8192)s+=String.fromCharCode.apply(null,u.subarray(i,i+8192));return btoa(s);}
 function b64D(s){var b=atob(s),a=new Uint8Array(b.length);for(var i=0;i<b.length;i++)a[i]=b.charCodeAt(i);return a;}
-function deriveKey(pin,salt){var e=new TextEncoder();return crypto.subtle.importKey('raw',e.encode(pin),'PBKDF2',false,['deriveKey']).then(function(k){return crypto.subtle.deriveKey({name:'PBKDF2',salt:salt,iterations:100000,hash:'SHA-256'},k,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);});}
-function encryptData(data,pin){var s=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12)),e=new TextEncoder();return deriveKey(pin,s).then(function(k){return crypto.subtle.encrypt({name:'AES-GCM',iv:iv},k,e.encode(JSON.stringify(data)));}).then(function(ct){return{encrypted:true,v:1,salt:b64E(s),iv:b64E(iv),data:b64E(ct)};});}
-function decryptData(p,pin){var s=b64D(p.salt),iv=b64D(p.iv),ct=b64D(p.data);return deriveKey(pin,s).then(function(k){return crypto.subtle.decrypt({name:'AES-GCM',iv:iv},k,ct);}).then(function(pt){return JSON.parse(new TextDecoder().decode(pt));});}
+function deriveKey(secret,salt,iterations){var e=new TextEncoder();return crypto.subtle.importKey('raw',e.encode(secret),'PBKDF2',false,['deriveKey']).then(function(k){return crypto.subtle.deriveKey({name:'PBKDF2',salt:salt,iterations:iterations,hash:'SHA-256'},k,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);});}
+/* v2: 300K iterations, key = PIN + familyCode */
+function encryptData(data,pin){var s=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12)),e=new TextEncoder();var secret=pin+(familyCode||'');return deriveKey(secret,s,300000).then(function(k){return crypto.subtle.encrypt({name:'AES-GCM',iv:iv},k,e.encode(JSON.stringify(data)));}).then(function(ct){return{encrypted:true,v:2,salt:b64E(s),iv:b64E(iv),data:b64E(ct)};});}
+/* decrypt: v1 = PIN only + 100K iters, v2 = PIN+familyCode + 300K iters */
+function decryptData(p,pin){var s=b64D(p.salt),iv=b64D(p.iv),ct=b64D(p.data);var ver=p.v||1;var secret=(ver>=2)?(pin+(familyCode||'')):pin;var iters=(ver>=2)?300000:100000;return deriveKey(secret,s,iters).then(function(k){return crypto.subtle.decrypt({name:'AES-GCM',iv:iv},k,ct);}).then(function(pt){return JSON.parse(new TextDecoder().decode(pt));});}
 
 /* ===== SCREENS ===== */
 function showScreen(id){document.querySelectorAll('.fullscreen').forEach(function(s){s.classList.add('hidden');});document.getElementById(id).classList.remove('hidden');}
@@ -368,7 +370,7 @@ auth.onAuthStateChanged(function(user){
 });
 
 /* ===== FAMILY CODE ===== */
-function generateCode(){var c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789',r='',rnd=crypto.getRandomValues(new Uint8Array(6));for(var i=0;i<6;i++)r+=c[rnd[i]%c.length];return r;}
+function generateCode(){var c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789',r='',rnd=crypto.getRandomValues(new Uint8Array(12));for(var i=0;i<12;i++)r+=c[rnd[i]%c.length];return r;}
 
 function joinFamily(){
   var code=document.getElementById('joinCode').value.trim().toUpperCase();
@@ -411,6 +413,8 @@ function submitPin(){
       return decryptData(payload,pinEntry).then(function(data){
         currentPin=pinEntry;
         importAllData(data);
+        var uid=auth.currentUser&&auth.currentUser.uid;
+        if(uid){db.collection('families').doc(familyCode).update({members:firebase.firestore.FieldValue.arrayUnion(uid)}).catch(function(){});}
         unlockApp();
       }).catch(function(){
         pinEntry='';renderDots('pinDots',pinEntry);
@@ -458,6 +462,7 @@ function submitNewPin(){
     encryptData(data,currentPin).then(function(enc){
       enc.createdBy=(gUserInfo&&gUserInfo.email)||'';
       enc.createdAt=firebase.firestore.FieldValue.serverTimestamp();
+      enc.members=[auth.currentUser.uid];
       return db.collection('families').doc(familyCode).set(enc);
     }).then(function(){
       localStorage.setItem('sc_family_code',familyCode);
@@ -720,7 +725,7 @@ function renderSyncUI(){
   var ls=localStorage.getItem('sc_last_sync');if(ls)h+='<p class="backup-info">Last sync: '+esc(ls)+'</p>';
   h+='<button class="btn btn-blue" onclick="forceSyncNow()">Sync Now</button></div>';
   h+='<div class="backup-section"><h3>Share with Family</h3><p class="setup-note">Share this code with family members. They sign in with Google, enter the code, and use the same PIN.</p>';
-  if(familyCode)h+='<div style="text-align:center;margin:10px 0"><div style="font-size:2em;font-weight:800;letter-spacing:6px;color:var(--dark)">'+esc(familyCode)+'</div><p class="setup-note">Family Code</p></div>';
+  if(familyCode)h+='<div style="text-align:center;margin:10px 0"><div style="font-size:1.4em;font-weight:800;letter-spacing:4px;color:var(--dark);word-break:break-all">'+esc(familyCode)+'</div><p class="setup-note">Family Code — share only with trusted family members</p></div>';
   h+='</div>';
   h+='<div class="backup-section"><button class="btn-outline" onclick="resetAll()">Sign Out / Reset</button></div>';
   document.getElementById('syncContent').innerHTML=h;
