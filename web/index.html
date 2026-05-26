@@ -497,8 +497,8 @@ function unlockApp(){
 }
 
 /* ===== DATA EXPORT/IMPORT ===== */
-function exportAllData(){var d={};for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&k.indexOf('sc_')===0)d[k]=localStorage.getItem(k);}d._savedAt=new Date().toISOString();d._savedBy=(gUserInfo&&gUserInfo.email)||'';return d;}
-function importAllData(data){for(var k in data){if(k.charAt(0)==='_')continue;if(k.indexOf('sc_')!==0)continue;localStorage.setItem(k,data[k]);}}
+function exportAllData(){var d={};for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&k.indexOf('sc_')===0&&k!=='sc_family_code')d[k]=localStorage.getItem(k);}d._savedAt=new Date().toISOString();d._savedBy=(gUserInfo&&gUserInfo.email)||'';return d;}
+function importAllData(data){for(var k in data){if(k.charAt(0)==='_')continue;if(k.indexOf('sc_')!==0)continue;if(k==='sc_family_code')continue;localStorage.setItem(k,data[k]);}}
 function mergeFromRemote(rd){
   var changed=false;
   for(var k in rd){
@@ -507,7 +507,7 @@ function mergeFromRemote(rd){
     else if(k==='sc_deleted_tasks'){/* local is authoritative */}
     else if(k==='sc_withdrawals'){var lw=getWithdrawals(),rw=[];try{rw=JSON.parse(rd[k]);}catch(e){}var tm={};for(var i=0;i<lw.length;i++)tm[lw[i].timestamp]=lw[i];var wc=Object.keys(tm).length;for(var i=0;i<rw.length;i++)if(!tm[rw[i].timestamp])tm[rw[i].timestamp]=rw[i];if(Object.keys(tm).length>wc){var mg=[];for(var t in tm)mg.push(tm[t]);mg.sort(function(a,b){return(a.timestamp||0)-(b.timestamp||0);});localStorage.setItem(k,JSON.stringify(mg));changed=true;}}
     else if(k.indexOf('sc_day_')===0){var ld={};try{ld=JSON.parse(localStorage.getItem(k)||'{}');}catch(e){}var rdd={};try{rdd=JSON.parse(rd[k]);}catch(e){}var merged={};var now=Date.now();for(var tid in ld)merged[tid]=ld[tid];for(var tid in rdd){var lct=localChanges[tid];if(!lct||now-lct>5000)merged[tid]=rdd[tid];}var ms=JSON.stringify(merged),ls=localStorage.getItem(k)||'{}';if(ms!==ls){localStorage.setItem(k,ms);changed=true;}}
-    else if(k.indexOf('sc_')===0){if(!localStorage.getItem(k)){localStorage.setItem(k,rd[k]);changed=true;}}
+    else if(k.indexOf('sc_')===0&&k!=='sc_family_code'){if(!localStorage.getItem(k)){localStorage.setItem(k,rd[k]);changed=true;}}
   }
   return changed;
 }
