@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com; style-src 'self' 'unsafe-inline'; img-src https: data:; connect-src https://*.googleapis.com https://*.firebaseio.com https://*.cloudfunctions.net wss://*.firebaseio.com; frame-src 'none'; object-src 'none'; base-uri 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com; style-src 'self' 'unsafe-inline'; img-src https: data:; connect-src https://*.googleapis.com https://*.firebaseio.com https://*.cloudfunctions.net wss://*.firebaseio.com; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'self'">
 <title>Star Chart</title>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js" integrity="sha384-ZaR6mWzmJtrRibZ1Vm7SoHFr8OXjyAuGAXalGDKqbxFT18oi/z+oZLIRFkpeNor1" crossorigin="anonymous"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js" integrity="sha384-I1LYojsZ5RM1cOda44Z2h42Qa6YfsQ1XkXxREnhp4ueYBR/4d1pG1K+NZM537Vsj" crossorigin="anonymous"></script>
@@ -705,7 +705,7 @@ function showDetail(d){var dd=getDayData(d),tasks=getTasks(),pts=getDayPoints(d)
 
 /* MONEY */
 function openMoney(){var e=getTotalEarned(),w=getTotalWithdrawn(),b=e-w,eu=(b/10).toFixed(2),ws=getWithdrawals();var h='<div style="text-align:center;padding:10px 0"><div style="font-weight:800;font-size:1.8em">'+b+' \u2B50</div><div style="font-size:1.1em;color:var(--muted);margin:4px 0">Available</div><div style="font-size:1.8em;font-weight:700;color:var(--green);margin:8px 0">\u20AC'+eu+'</div><div style="font-size:.85em;color:var(--muted)">10 pts = \u20AC1</div></div>';if(b>0)h+='<button class="btn btn-green" onclick="cashOut()" style="margin:12px 0">\uD83D\uDCB0 Cash out! (\u20AC'+eu+')</button>';if(ws.length){h+='<h3 style="margin:12px 0 6px">Withdrawals</h3>';for(var i=ws.length-1;i>=0;i--)h+='<div class="withdrawal-item"><strong>\u20AC'+(ws[i].points/10).toFixed(2)+'</strong> ('+ws[i].points+' \u2B50) &mdash; '+esc(ws[i].date)+'</div>';}document.getElementById('moneyContent').innerHTML=h;openOverlay('moneyOverlay');}
-function cashOut(){var e=getTotalEarned(),w=getTotalWithdrawn(),b=e-w;if(b<=0)return;var ws=getWithdrawals();ws.push({points:b,euros:(b/10).toFixed(2),date:today(),timestamp:Date.now()});saveWithdrawals(ws);confetti();showToast('\uD83D\uDCB0 Cashed out \u20AC'+(b/10).toFixed(2)+'!');openMoney();}
+function cashOut(){var e=getTotalEarned(),w=getTotalWithdrawn(),b=e-w;if(b<=0)return;if(!confirm('Cash out \u20AC'+(b/10).toFixed(2)+'? This will reset your star balance.'))return;var ws=getWithdrawals();ws.push({points:b,euros:(b/10).toFixed(2),date:today(),timestamp:Date.now()});saveWithdrawals(ws);confetti();showToast('\uD83D\uDCB0 Cashed out \u20AC'+(b/10).toFixed(2)+'!');openMoney();}
 
 /* ADMIN */
 function openAdmin(){showAdminPanel();}
@@ -727,6 +727,7 @@ function renderSyncUI(){
 }
 function forceSyncNow(){pushEncrypted().then(function(){renderSyncUI();showToast('Synced!');});}
 function resetAll(){
+  if(!confirm('Sign out and erase all local data? This cannot be undone.'))return;
   if(unsubFirestore)unsubFirestore();
   if(bgSyncInterval)clearInterval(bgSyncInterval);
   auth.signOut();
