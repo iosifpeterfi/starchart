@@ -731,13 +731,14 @@ function renderSyncUI(){
   var ls=localStorage.getItem('sc_last_sync');if(ls)h+='<p class="backup-info">Last sync: '+esc(ls)+'</p>';
   h+='<button class="btn btn-blue" onclick="forceSyncNow()">Sync Now</button></div>';
   h+='<div class="backup-section"><h3>Share with Family</h3><p class="setup-note">Share this code with family members. They sign in with Google, enter the code, and use the same PIN.</p>';
-  if(familyCode)h+='<div style="text-align:center;margin:10px 0"><div style="font-size:1.4em;font-weight:800;letter-spacing:4px;color:var(--dark);word-break:break-all">'+esc(familyCode)+'</div><p class="setup-note">Family Code — share only with trusted family members</p></div>';
+  if(familyCode)h+='<div style="text-align:center;margin:10px 0"><div style="font-size:1.4em;font-weight:800;letter-spacing:4px;color:var(--dark);word-break:break-all">'+esc(familyCode)+'</div><button onclick="copyCode()" style="margin:6px 0;padding:6px 16px;border:2px solid #ddd;border-radius:8px;background:#fff;font-size:.85em;cursor:pointer">\uD83D\uDCCB Copy Code</button><p class="setup-note">Family Code — share only with trusted family members</p></div>';
   h+='</div>';
   h+='<div class="backup-section"><h3>Invite Family Member</h3><p class="setup-note">Enter the Google email of the person you want to invite. They must be invited before they can join.</p><input type="text" id="inviteEmail" placeholder="email@gmail.com" style="width:100%;padding:10px;border:2px solid #ddd;border-radius:10px;font-size:.9em;margin:6px 0"><button class="btn btn-orange" onclick="inviteMember()">Invite</button></div>';
   if(familyCode&&familyCode.length<12)h+='<div class="backup-section"><h3>\u26A0\uFE0F Upgrade Security</h3><p class="setup-note">Your family uses the old 6-character code. Upgrade to a 12-character code with stronger encryption. All family members will need the new code.</p><button class="btn btn-orange" onclick="migrateFamily()">Upgrade to v2</button></div>';
   h+='<div class="backup-section"><button class="btn-outline" onclick="resetAll()">Sign Out / Reset</button></div>';
   document.getElementById('syncContent').innerHTML=h;
 }
+function copyCode(){if(!familyCode)return;navigator.clipboard.writeText(familyCode).then(function(){showToast('Code copied!');}).catch(function(){showToast(familyCode);});}
 function forceSyncNow(){pushEncrypted().then(function(){renderSyncUI();showToast('Synced!');});}
 function inviteMember(){
   var email=(document.getElementById('inviteEmail').value||'').trim().toLowerCase();
