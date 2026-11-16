@@ -463,7 +463,7 @@ def ___etny_on_input___(data):
             elif _task_caller and signer.lower() != _task_caller.lower():
                 raise PermissionError(
                     f"Signer {signer} does not match the task caller for new-state migration")
-            bound = intent.get("bound", env.get("bound", "0"))
+            bound = intent.get("bound", "0")
             result = migrate_state(family_id, bound)
             result["signer"] = signer
         elif op == "read":
