@@ -1,0 +1,51 @@
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+/**
+ * Creates an {@link IKeyManager} backed by the `eciesjs` library.
+ *
+ * The factory dynamically imports `eciesjs` so the heavy crypto dependency is
+ * only loaded when MWP transport is actually used. The returned object closes
+ * over the imported symbols, allowing synchronous methods like
+ * `generateKeyPair` and `validatePeerKey` to work without a second await.
+ *
+ * @returns A ready-to-use key manager instance.
+ */
+export function createKeyManager() {
+    return __awaiter(this, void 0, void 0, function* () {
+        const { decrypt, encrypt, PrivateKey, PublicKey } = yield import('eciesjs');
+        return {
+            generateKeyPair() {
+                const privateKey = new PrivateKey();
+                return {
+                    privateKey: new Uint8Array(privateKey.secret),
+                    publicKey: privateKey.publicKey.toBytes(true),
+                };
+            },
+            encrypt(plaintext, theirPublicKey) {
+                return __awaiter(this, void 0, void 0, function* () {
+                    const plaintextBuffer = Buffer.from(plaintext, 'utf8');
+                    const encryptedBuffer = encrypt(theirPublicKey, plaintextBuffer);
+                    return encryptedBuffer.toString('base64');
+                });
+            },
+            decrypt(encryptedB64, myPrivateKey) {
+                return __awaiter(this, void 0, void 0, function* () {
+                    const encryptedBuffer = Buffer.from(encryptedB64, 'base64');
+                    const decryptedBuffer = yield decrypt(myPrivateKey, encryptedBuffer);
+                    return Buffer.from(decryptedBuffer).toString('utf8');
+                });
+            },
+            validatePeerKey(key) {
+                PublicKey.fromHex(Buffer.from(key).toString('hex'));
+            },
+        };
+    });
+}
+//# sourceMappingURL=KeyManager.js.map

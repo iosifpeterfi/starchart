@@ -73543,6 +73543,7 @@ ${message.length}`, "utf-8");
 
   // src/ethernity_runner.js
   init_buffer_shim();
+  var import_buffer6 = __toESM(require_buffer());
 
   // node_modules/@ethernity-cloud/runner/runner.js
   init_buffer_shim();
@@ -130224,6 +130225,7 @@ ${message.length}`, "utf-8");
   var runner_default = EthernityCloudRunner;
 
   // src/ethernity_runner.js
+  if (typeof globalThis.Buffer === "undefined") globalThis.Buffer = import_buffer6.Buffer;
   var TETNY_TOKEN = "0x02882F03097fE8cD31afbdFbB5D72a498B41112c";
   var POX_1_2 = "0x7E7C6eB435E3687CfDfe18C09C0340eb70567d7b";
   var APPROVE_ABI = ["function approve(address spender, uint256 amount) returns (bool)", "function allowance(address owner, address spender) view returns (uint256)"];

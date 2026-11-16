@@ -10,7 +10,6 @@ await esbuild.build({
   platform: 'browser',
   target: ['es2020'],
   outfile: 'dist/ethernity.bundle.js',
-  inject: ['src/buffer-shim.js'],
   define: {
     'global': 'globalThis',
   },
