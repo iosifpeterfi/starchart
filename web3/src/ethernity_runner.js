@@ -25,6 +25,7 @@ import { ethers } from 'ethers';
 const TETNY_TOKEN = '0x02882F03097fE8cD31afbdFbB5D72a498B41112c';
 const POX_1_2 = '0x7E7C6eB435E3687CfDfe18C09C0340eb70567d7b';
 const APPROVE_ABI = ['function approve(address spender, uint256 amount) returns (bool)', 'function allowance(address owner, address spender) view returns (uint256)'];
+const POX_1_2_ABI_FRAGMENT = ['function _addDORequest(uint8,uint8,uint8,uint8,uint8,uint8,uint256,string,string,string,string) returns (uint256)', 'function _getOrder(uint256) view returns (tuple)', 'function _approveOrder(uint256)', 'function _cancelDORequest(uint256)', 'function _getResultFromOrder(uint256) view returns (tuple)', 'function _getDORequest(uint256) view returns (tuple)', 'function _getDORequestMetadata(uint256) view returns (tuple)', 'function _getMyDPRequests() view returns (uint256[])', 'event _addDORequestEV(address,uint256)'];
 let _approved = false;
 
 const ENCLAVE_CONFIG = {
@@ -66,6 +67,16 @@ function getRunner() {
     if (w) {
       _runner._esrWalletMemo = _runner._esrWalletMemo || {};
       _runner._esrWalletMemo[ENCLAVE_CONFIG.secureLockEnclave] = w;
+    }
+    // PoX 1.2 override: the JS runner 0.6.27 still points at the old bloxberg
+    // contract. Rewire the protocol contract to PoX 1.2 until the runner is fixed.
+    const pc = _runner.protocolContract;
+    if (pc && pc.etnyContract) {
+      const pox12 = new ethers.Contract(POX_1_2, pc.etnyContract.interface, pc.signer);
+      const pox12Provider = new ethers.Contract(POX_1_2, pc.etnyContract.interface, pc.provider);
+      pc.etnyContract = pox12;
+      pc.etnyContactWithProvider = pox12Provider;
+      pc.contractAddress = () => POX_1_2;
     }
   }
   return _runner;
