@@ -690,19 +690,38 @@ function enqueueAction(action, intentData){
   render();
   if (!window.EthernityRunner) { showToast('Offline — change saved locally, will sync when connected'); }
   _queue.push({ action: action, intentData: intentData, tries: 0 });
+  while (_queue.length > 50) { _queue.shift(); console.warn('[queue] dropped oldest job — cap 50'); }
   if (!window.EthernityRunner) { _saveQueue(); updateSyncUI(); return; }
   _saveQueue();
   updateSyncUI();
   drainQueue();
 }
 
+var SESSION_LS_KEY = 'sc2_session_order';
+var _drainWatchdog = null;
+
 async function ensureSession(){
   if (window.EthernityRunner.hasActiveSession()) return true;
+  /* Try to reattach to a running session from localStorage */
+  var savedOrder = localStorage.getItem(SESSION_LS_KEY);
+  if (savedOrder) {
+    try {
+      console.log('[session] reattaching to order', savedOrder);
+      await window.EthernityRunner.attachSession(parseInt(savedOrder));
+      console.log('[session] reattached');
+      return true;
+    } catch(e) {
+      console.warn('[session] reattach failed:', e.message);
+      localStorage.removeItem(SESSION_LS_KEY);
+    }
+  }
+  /* Open a new session */
   try {
     setSyncDot('yellow spin');
     console.log('[session] opening interactive session...');
     var info = await window.EthernityRunner.startSession();
     console.log('[session] opened, order', info.orderId);
+    if (info.orderId) localStorage.setItem(SESSION_LS_KEY, String(info.orderId));
     return true;
   } catch(e){
     console.warn('[session] failed to open:', e.message);
@@ -717,6 +736,14 @@ async function drainQueue(){
   }
   console.log('[drain] starting, queue length:', _queue.length);
   _queueRunning = true; _activeWrite = true; updateSyncUI();
+  /* T4: watchdog — force-reset if no progress in 5 minutes */
+  if (_drainWatchdog) clearTimeout(_drainWatchdog);
+  _drainWatchdog = setTimeout(function() {
+    if (_queueRunning) {
+      console.warn('[drain] watchdog: stuck for 5 min — force-resetting');
+      _queueRunning = false; _activeWrite = false; updateSyncUI();
+    }
+  }, 300000);
   try {
     var useSession = await ensureSession();
     while (_queue.length){
@@ -740,7 +767,8 @@ async function drainQueue(){
           console.log('[drain] session response:', result && result.status);
         } else {
           console.log('[drain] sending via one-shot task...');
-          result = await window.EthernityRunner.submitTask(familyId, intent, function(){});
+          var taskTimeout = new Promise(function(_, rej) { setTimeout(function(){ rej(new Error('one-shot task timeout 120s')); }, 120000); });
+          result = await Promise.race([window.EthernityRunner.submitTask(familyId, intent, function(){}), taskTimeout]);
           console.log('[drain] task response:', result && result.status);
         }
         var resStr = (typeof result === 'string') ? result : JSON.stringify(result || '');
@@ -807,6 +835,7 @@ async function drainQueue(){
       }
     }
   } finally {
+    if (_drainWatchdog) { clearTimeout(_drainWatchdog); _drainWatchdog = null; }
     _queueRunning = false; _activeWrite = false; updateSyncUI();
   }
 }
@@ -975,12 +1004,6 @@ async function onSessionReady(session) {
           console.log('Family state loaded' + (r.fromCache ? ' (from cache, 0 orders)' : ' (fresh read)'));
           completeProgress(); await sleep(300); showProgress(false);
           unlockApp();
-          /* Pre-open session in background so chore taps are instant */
-          if (window.EthernityRunner && !window.EthernityRunner.hasActiveSession()) {
-            window.EthernityRunner.startSession().then(function(info) {
-              console.log('[session] pre-opened on login, order', info && info.orderId);
-            }).catch(function(e) { console.warn('[session] pre-open failed:', e.message); });
-          }
         } else {
           /* No v63 family for this id (empty state, or we're not a member): start
              fresh — do NOT fall back to stale local state. */
@@ -1047,9 +1070,11 @@ async function doLogout() {
     await new Promise(function(r) { var c = setInterval(function() { if (!_queueRunning && !_activeWrite) { clearInterval(c); r(); } }, 200); });
   }
   try { if (window.EthernityRunner && window.EthernityRunner.hasActiveSession()) await window.EthernityRunner.closeSession(); } catch(e){ console.warn('session close on logout:', e.message); }
+  if (_drainWatchdog) { clearTimeout(_drainWatchdog); _drainWatchdog = null; }
   _queue = []; _saveQueue(); _queueRunning = false; _activeWrite = false; _queueErr = 0;
   esrVersion = 0; esrNonce = 0;
   _lastBal = null; _lastGas = null;
+  localStorage.removeItem(SESSION_LS_KEY);
   window._bloxbergPrivateKey = null;
   window._lastSession = null;
   if (window.EthernityRunner && window.EthernityRunner.resetRunner) window.EthernityRunner.resetRunner();
@@ -1082,12 +1107,6 @@ async function createFamily() {
     await executeIntent('create_family', {});
     localStorage.setItem('sc2_family_id', familyId);
     completeProgress();
-    /* Pre-open the session in the background so chore taps are instant */
-    if (window.EthernityRunner && !window.EthernityRunner.hasActiveSession()) {
-      window.EthernityRunner.startSession().then(function(info) {
-        console.log('[session] pre-opened after create, order', info && info.orderId);
-      }).catch(function(e) { console.warn('[session] pre-open failed:', e.message); });
-    }
     await sleep(350);          /* let the bar visibly reach 100% */
     showProgress(false);
     /* Show the shareable Family ID before entering the app. */

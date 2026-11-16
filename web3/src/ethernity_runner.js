@@ -301,6 +301,13 @@ async function sessionRead(familyId, signedIntent) {
   });
 }
 
+async function attachSession(orderId) {
+  const runner = getRunner();
+  _session = await runner.attachSession(orderId, ENCLAVE_CONFIG.secureLockEnclave);
+  persistWallet(runner);
+  return { orderId: _session.orderId, deadline: _session.deadline };
+}
+
 async function closeSession() {
   if (!_session) return null;
   const s = _session;
@@ -347,6 +354,7 @@ window.EthernityRunner = {
   sendSessionInput,
   sessionExecute,
   sessionRead,
+  attachSession,
   closeSession,
   hasActiveSession,
   resetRunner,

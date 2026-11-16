@@ -129151,6 +129151,12 @@ ${message.length}`, "utf-8");
       intent: signedIntent
     });
   }
+  async function attachSession(orderId) {
+    const runner = getRunner2();
+    _session = await runner.attachSession(orderId, ENCLAVE_CONFIG.secureLockEnclave);
+    persistWallet(runner);
+    return { orderId: _session.orderId, deadline: _session.deadline };
+  }
   async function closeSession() {
     if (!_session) return null;
     const s = _session;
@@ -129197,6 +129203,7 @@ ${message.length}`, "utf-8");
     sendSessionInput,
     sessionExecute,
     sessionRead,
+    attachSession,
     closeSession,
     hasActiveSession,
     resetRunner,

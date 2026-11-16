@@ -1,26 +1,28 @@
-name: "StarChart Web3 PoX 1.2 Sprint"
-description: "Upgrade StarChart enclave to PoX 1.2, add state migration, wire interactive sessions into frontend"
+name: "StarChart Web3 Session Reliability Sprint"
+description: "Fix stuck drain queue, session reattach, nonce races, timeouts, and clean logout"
 
 branch: "main"
 base_branch: "main"
 
+plan: "E3_SESSION_RELIABILITY_PLAN.md"
+
 review:
   areas:
-    - "Enclave backend: migrate_state fence logic, session handler, action dispatch"
-    - "ESR state: fence boundary correctness, nonce handling, ACL preservation during migration"
-    - "JS runner wrapper: session lifecycle (start/send/close), fallback to one-shot, config update"
-    - "Frontend queue: drainQueue session integration, optimistic UI preserved, logout cleanup"
-    - "Security: no new XSS, signature verification preserved, session handler never raises"
+    - "Session lifecycle: only drainQueue opens sessions, no pre-open races"
+    - "Session reattach: attachSession from localStorage, fallback to new session"
+    - "Drain resilience: watchdog resets stuck state, one-shot has timeout"
+    - "Logout cleanup: queue cleared, session closed, all state reset"
+    - "Regression: optimistic UI preserved, signatures verified, no XSS"
   max_rounds: 10
   exit_bar: "3 consecutive rounds with 0 HIGH findings"
 
 invariants:
-  - "Every intent is EIP-191 signature-verified before state mutation"
-  - "Exactly-once esr_nonce prevents duplicate commits"
-  - "Session handler ___etny_on_input___ never raises — returns structured errors"
+  - "No startSession calls outside ensureSession/drainQueue"
+  - "ensureSession tries attachSession before startSession"
+  - "drainQueue one-shot path has a timeout (120s)"
+  - "drainQueue watchdog resets _queueRunning after 5 minutes of no progress"
+  - "doLogout clears queue, resets _queueRunning/_activeWrite, removes session orderId"
+  - "Queue capped at 50 items"
   - "enqueueAction still applies optimistic local state before queueing"
-  - "drainQueue falls back to submitTask if session unavailable"
-  - "Logout closes any active session"
-  - "ENCLAVE_CONFIG.enclaveAddress matches v70 ESR wallet 0x6AE9190707b11824ED043CaBAF90BFf1742b482d"
-  - "migrate_state uses StateRegistry.fence() not manual state copy"
+  - "Session orderId persisted in localStorage"
   - "Frontend bundle builds without errors (node build.mjs)"
