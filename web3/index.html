@@ -1017,6 +1017,7 @@ async function doLoginWallet() {
 function doLogin() { doLoginWeb3Auth(); }
 
 async function doLogout() {
+  stopFundPolling();
   if (_queue.length && !confirm('You have ' + _queue.length + ' unsent change(s). Logging out will discard them. Continue?')) return;
   if (_queueRunning) {
     showToast('Waiting for current sync to finish…');
