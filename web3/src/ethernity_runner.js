@@ -17,6 +17,12 @@
  */
 import EthernityCloudRunner from '@ethernity-cloud/runner/runner.js';
 import { ECAddress, ECStatus } from '@ethernity-cloud/runner/enums.js';
+import { ethers } from 'ethers';
+
+const TETNY_TOKEN = '0x02882F03097fE8cD31afbdFbB5D72a498B41112c';
+const POX_1_2 = '0x7E7C6eB435E3687CfDfe18C09C0340eb70567d7b';
+const APPROVE_ABI = ['function approve(address spender, uint256 amount) returns (bool)', 'function allowance(address owner, address spender) view returns (uint256)'];
+let _approved = false;
 
 const ENCLAVE_CONFIG = {
   secureLockEnclave: 'starchart_enclave',
@@ -59,22 +65,26 @@ function getRunner() {
       _runner._esrWalletMemo[ENCLAVE_CONFIG.secureLockEnclave] = w;
     }
     // PoX 1.2 on bloxberg requires tETNY approval — the JS runner skips it
-    // for bloxberg (family !== 'ecld'), so we patch checkAllowance.
-    const origCheck = _runner.checkAllowance.bind(_runner);
-    _runner.checkAllowance = async function(taskPrice) {
-      await origCheck(taskPrice);
-      try {
-        await this.resolveNetworkContext();
-        const ok = await this.tokenContract.checkAndSetAllowance(
-          this.protocolContract.contractAddress(),
-          '100',
-          taskPrice.toString()
-        );
-        if (!ok) console.warn('tETNY allowance check returned false');
-      } catch (e) {
-        console.warn('tETNY allowance check failed (may already be set):', e.message);
-      }
-    };
+    // for bloxberg (family !== 'ecld'). Manual approve once per session.
+    if (!_approved && key) {
+      (async () => {
+        try {
+          const provider = new ethers.providers.JsonRpcProvider('https://bloxberg.ethernity.cloud');
+          const signer = new ethers.Wallet(key, provider);
+          const token = new ethers.Contract(TETNY_TOKEN, APPROVE_ABI, signer);
+          const current = await token.allowance(signer.address, POX_1_2);
+          if (current.lt(ethers.utils.parseEther('10'))) {
+            console.log('[starchart] approving tETNY for PoX 1.2...');
+            const tx = await token.approve(POX_1_2, ethers.constants.MaxUint256);
+            await tx.wait();
+            console.log('[starchart] tETNY approved for PoX 1.2');
+          }
+          _approved = true;
+        } catch (e) {
+          console.warn('[starchart] tETNY approval failed:', e.message);
+        }
+      })();
+    }
   }
   return _runner;
 }
