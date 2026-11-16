@@ -338,6 +338,7 @@ var selectedEmoji = EMOJIS[0];
 
 /* ===== HELPERS ===== */
 function esc(s){if(!s)return '';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+function jsEsc(s){if(!s)return '';return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'\\"').replace(/\n/g,'\\n').replace(/\r/g,'\\r');}
 function today(){return new Date().toISOString().slice(0,10);}
 function lsGet(k,d){try{var v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}}
 function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
@@ -956,6 +957,8 @@ function doLogin() { doLoginWeb3Auth(); }
 
 async function doLogout() {
   try { if (window.EthernityRunner && window.EthernityRunner.hasActiveSession()) await window.EthernityRunner.closeSession(); } catch(e){ console.warn('session close on logout:', e.message); }
+  _queue = []; _saveQueue(); _queueRunning = false; _queueErr = 0;
+  esrVersion = 0; esrNonce = 0;
   window._bloxbergPrivateKey = null;
   window._lastSession = null;
   if (window.EthernityRunner && window.EthernityRunner.resetRunner) window.EthernityRunner.resetRunner();
@@ -1224,7 +1227,7 @@ function render() {
   var h = '<div class="section-title">\uD83D\uDCAA Must Do</div><div class="grid">';
   for (var i = 0; i < m.length; i++) {
     var t = m[i], dn = !!dd[t.id];
-    h += '<div class="card' + (dn ? ' done' : ' mandatory-bg') + (_pend[t.id] ? ' pending' : '') + '" onclick="tap(\'' + esc(t.id) + '\')" id="card-' + esc(t.id) + '">';
+    h += '<div class="card' + (dn ? ' done' : ' mandatory-bg') + (_pend[t.id] ? ' pending' : '') + '" onclick="tap(\'' + esc(jsEsc(t.id)) + '\')" id="card-' + esc(t.id) + '">';
     if (_pend[t.id]) h += '<span class="syncing">\u23f3</span>';
     if (dn) h += '<span class="check">\u2705</span>';
     h += '<span class="emoji">' + esc(taskEmoji(t)) + '</span><span class="label">' + esc(t.name) + '</span></div>';
@@ -1234,7 +1237,7 @@ function render() {
     var t = o[i], dn = !!dd[t.id], lk = !am, c = 'card optional';
     if (dn) c += ' done'; else if (lk) c += ' locked';
     if (_pend[t.id]) c += ' pending';
-    h += '<div class="' + c + '" onclick="tap(\'' + esc(t.id) + '\')" id="card-' + esc(t.id) + '">';
+    h += '<div class="' + c + '" onclick="tap(\'' + esc(jsEsc(t.id)) + '\')" id="card-' + esc(t.id) + '">';
     if (_pend[t.id]) h += '<span class="syncing">\u23f3</span>';
     if (dn) h += '<span class="check">\u2705</span>';
     else if (lk) h += '<span class="lock">\uD83D\uDD12</span>';
@@ -1371,7 +1374,7 @@ function openHistory() {
   if (!k.length) h = '<p style="color:var(--muted);text-align:center;padding:20px">No history yet</p>';
   for (var i = 0; i < k.length && i < 30; i++) {
     var dp = getDayPoints(k[i]);
-    h += '<div class="history-item" onclick="showDetail(\'' + esc(k[i]) + '\')"><span class="history-date">' + esc(k[i]) + '</span><span class="history-pts">' + dp + ' \u2B50</span></div>';
+    h += '<div class="history-item" onclick="showDetail(\'' + esc(jsEsc(k[i])) + '\')"><span class="history-date">' + esc(k[i]) + '</span><span class="history-pts">' + dp + ' \u2B50</span></div>';
   }
   document.getElementById('historyContent').innerHTML = h;
   openOverlay('historyOverlay');
@@ -1446,7 +1449,7 @@ function showAdminPanel() {
   var at = getTasks();
   for (var i = 0; i < at.length; i++) {
     var t = at[i];
-    h += '<div class="stat-row"><span class="stat-label">' + esc(taskEmoji(t)) + ' ' + esc(t.name) + (t.mandatory ? ' (must do)' : ' ' + t.points + ' \u2B50') + '</span><span class="stat-value"><button onclick="deleteTask(\'' + esc(t.id) + '\')" style="background:#E53935;color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:.85em;cursor:pointer">\u2716</button></span></div>';
+    h += '<div class="stat-row"><span class="stat-label">' + esc(taskEmoji(t)) + ' ' + esc(t.name) + (t.mandatory ? ' (must do)' : ' ' + t.points + ' \u2B50') + '</span><span class="stat-value"><button onclick="deleteTask(\'' + esc(jsEsc(t.id)) + '\')" style="background:#E53935;color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:.85em;cursor:pointer">\u2716</button></span></div>';
   }
 
   document.getElementById('adminContent').innerHTML = h;

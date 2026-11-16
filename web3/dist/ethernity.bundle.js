@@ -128817,6 +128817,13 @@ ${message.length}`, "utf-8");
   }
   var _session = null;
   async function startSession(onProgress) {
+    if (_session && !_session.closed) {
+      try {
+        await _session.close();
+      } catch (e) {
+      }
+      _session = null;
+    }
     const runner = getRunner2();
     const code14 = "___etny_on_input___";
     _session = await runner.runSession(
@@ -128832,8 +128839,12 @@ ${message.length}`, "utf-8");
   async function sendSessionInput(envelope) {
     if (!_session || _session.closed) throw new Error("No active session \u2014 call startSession first");
     const data = typeof envelope === "string" ? envelope : JSON.stringify(envelope);
-    const seq = await _session.sendInput(data);
-    const [msg] = await _session.waitOutputs(1);
+    await _session.sendInput(data);
+    const timeoutMs = Math.max(3e4, (_session.deadline || Date.now() + 12e4) - Date.now());
+    const [msg] = await Promise.race([
+      _session.waitOutputs(1),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("Session response timed out")), timeoutMs))
+    ]);
     let parsed = msg;
     try {
       parsed = typeof msg === "string" ? JSON.parse(msg) : msg;
@@ -128868,6 +128879,9 @@ ${message.length}`, "utf-8");
     _runner = null;
     _runnerKey = null;
     _session = null;
+    Object.keys(_lastVersion).forEach(function(k) {
+      delete _lastVersion[k];
+    });
   }
   function hasActiveSession() {
     return _session !== null && !_session.closed;

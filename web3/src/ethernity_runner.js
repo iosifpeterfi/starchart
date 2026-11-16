@@ -202,6 +202,10 @@ async function waitForVersion(familyId, sinceVersion, timeoutMs) {
 let _session = null;
 
 async function startSession(onProgress) {
+  if (_session && !_session.closed) {
+    try { await _session.close(); } catch (e) { /* best-effort cleanup */ }
+    _session = null;
+  }
   const runner = getRunner();
   const code = '___etny_on_input___';
   _session = await runner.runSession(
@@ -218,8 +222,12 @@ async function startSession(onProgress) {
 async function sendSessionInput(envelope) {
   if (!_session || _session.closed) throw new Error('No active session — call startSession first');
   const data = typeof envelope === 'string' ? envelope : JSON.stringify(envelope);
-  const seq = await _session.sendInput(data);
-  const [msg] = await _session.waitOutputs(1);
+  await _session.sendInput(data);
+  const timeoutMs = Math.max(30000, (_session.deadline || Date.now() + 120000) - Date.now());
+  const [msg] = await Promise.race([
+    _session.waitOutputs(1),
+    new Promise((_, reject) => setTimeout(() => reject(new Error('Session response timed out')), timeoutMs)),
+  ]);
   let parsed = msg;
   try { parsed = typeof msg === 'string' ? JSON.parse(msg) : msg; } catch (e) { /* leave */ }
   if (parsed && parsed.version != null && parsed.family_id) {
@@ -255,6 +263,7 @@ function resetRunner() {
   _runner = null;
   _runnerKey = null;
   _session = null;
+  Object.keys(_lastVersion).forEach(function(k) { delete _lastVersion[k]; });
 }
 
 function hasActiveSession() {

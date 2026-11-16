@@ -18,10 +18,15 @@ leaves the enclave.
 from __future__ import annotations
 
 import json
+import re
 import time
 
 from eth_account.messages import encode_defunct
 from web3 import Web3
+
+_VALID_ID = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
+_VALID_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_MAX_NAME_LEN = 100
 
 # ─────────────────────────────────────────────────────────────────────
 #  Default tasks (same as current StarChart)
@@ -95,8 +100,12 @@ def create_family(state: dict, intent: dict, signer: str) -> dict:
 
 def complete_chore(state: dict, intent: dict, signer: str) -> dict:
     validate_membership(state, signer)
-    date = intent["date"]  # "YYYY-MM-DD"
+    date = intent["date"]
     chore_id = intent["chore_id"]
+    if not _VALID_DATE.match(str(date)):
+        raise ValueError(f"Invalid date format: {date!r}")
+    if not _VALID_ID.match(str(chore_id)):
+        raise ValueError(f"Invalid chore_id format: {chore_id!r}")
     task_ids = {t["id"] for t in state.get("tasks", [])}
     if chore_id not in task_ids:
         raise ValueError(f"Unknown chore: {chore_id}")
@@ -110,6 +119,10 @@ def uncomplete_chore(state: dict, intent: dict, signer: str) -> dict:
     validate_membership(state, signer)
     date = intent["date"]
     chore_id = intent["chore_id"]
+    if not _VALID_DATE.match(str(date)):
+        raise ValueError(f"Invalid date format: {date!r}")
+    if not _VALID_ID.match(str(chore_id)):
+        raise ValueError(f"Invalid chore_id format: {chore_id!r}")
     if date in state.get("days", {}) and chore_id in state["days"][date]:
         state["days"][date][chore_id] = False
     return state
@@ -121,6 +134,10 @@ def add_task(state: dict, intent: dict, signer: str) -> dict:
     required_fields = {"id", "name", "emoji", "points", "mandatory"}
     if not required_fields.issubset(task.keys()):
         raise ValueError(f"Task missing fields: {required_fields - task.keys()}")
+    if not _VALID_ID.match(str(task["id"])):
+        raise ValueError(f"Invalid task ID format: {task['id']!r}")
+    if len(str(task.get("name", ""))) > _MAX_NAME_LEN:
+        raise ValueError(f"Task name too long (max {_MAX_NAME_LEN} chars)")
     existing_ids = {t["id"] for t in state.get("tasks", [])}
     if task["id"] in existing_ids:
         raise ValueError(f"Task ID already exists: {task['id']}")
