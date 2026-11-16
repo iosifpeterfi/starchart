@@ -1,0 +1,30 @@
+{
+    "PROJECT_NAME": "starchart_enclave",
+    "BLOCKCHAIN_NETWORK": "BLOXBERG_TESTNET",
+    "DAPP_TYPE": "Pynithy",
+    "IPFS_ENDPOINT": "https://ipfs.ethernity.cloud",
+    "IPFS_TOKEN": "",
+    "VERSION": 69,
+    "PREDECESSOR_HASH_SECURELOCK": "",
+    "IPFS_HASH": "QmYDz5W4kGD6cGKGkZCHVAD3pYVtp4bkP4pwFN6XcgSyTB",
+    "MEMORY_TO_ALLOCATE": "1G",
+    "TRUSTED_ZONE_IMAGE": "etny-pynithy-testnet",
+    "BASE_IMAGE_TAG": "python-3.14.6-alpine3.24-scone6.0.7",
+    "DOCKER_REPO_URL": "registry.ethernity.cloud:443/debuggingdelight/ethernity-cloud-sdk-registry/sconecuratedimages/apps",
+    "DOCKER_LOGIN": "",
+    "DOCKER_PASSWORD": "",
+    "SECURELOCK_SESSION": "starchart_enclave_SECURELOCK_V3_testnet_69",
+    "WALLET_ADDRESS": "0xa6Ffb6e46c55c0166E2d830Ab4daAFcd74Dd5dfE",
+    "ENC_PRIVATE_KEY": "xfdK34aUHCF0cn7FgwDpoRuREKRcDnJXLnol1RTRT7hvUXAgGGJDuchx/J7KZZZwobnfFz+W1ws8MrN68N4ddhMXWpT2o5hKJn4hSGA1gWwgy/cqiGYu7CTHAKhvbx8+PSzQ/G0tv5quPJQ666qIfQ==",
+    "REGISTRY_PATH": "/home/node/.openclaw/workspace/StarChart/enclave/build/registry",
+    "MRENCLAVE_SECURELOCK": "4cbbfb6f295e05613addb8212dea8ebcc748b33860b0f3357845765758be5d74",
+    "IPFS_DOCKER_COMPOSE_HASH": "QmTbo3pgRpow5N52iVmSfZw2AXtozke1DWGBjhpxCNXque",
+    "IPFS_HASH_PUBLISH": "",
+    "REMOTE_CERT_EXTRACTION": "always",
+    "IPFS_UPLOAD_FINGERPRINT": "25db964376774b4302fb1eecb249bc46fdc270e0aa2b4395864f1df557fa0db0",
+    "ESR": {
+        "enabled": true,
+        "contract_address": "0x0Ea1728EAE108FD3B9340ae91451348E2Cc6b4E4",
+        "wallet_address": "0xe8e0f29f800cC8853DA8ce91377edB195E1dc603"
+    }
+}
