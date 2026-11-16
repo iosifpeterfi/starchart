@@ -1,0 +1,18 @@
+{
+  "name": "web3",
+  "version": "1.0.0",
+  "description": "",
+  "main": "starchart-auth.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@ethernity-cloud/runner": "^0.6.27",
+    "@web3auth/modal": "^11.3.0",
+    "esbuild": "^0.28.1",
+    "ethers": "^6.17.0"
+  }
+}
