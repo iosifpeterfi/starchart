@@ -707,7 +707,7 @@ async function drainQueue(){
       var job = _queue[0];
       try {
         var onNonce = esrNonce || 0;
-        try { var n = await window.EthernityRunner.nonce(familyId); if (n != null) onNonce = n; } catch(_e){}
+        try { var n = await window.EthernityRunner.nonce(familyId); if (n != null) onNonce = Math.max(onNonce, n); } catch(_e){}
         var idata = Object.assign({}, job.intentData); idata.esr_nonce = onNonce + 1;
         var intent = await signIntent(job.action, idata);
         var result;
@@ -721,6 +721,10 @@ async function drainQueue(){
           throw new Error(result.message || result.error || 'enclave error');
         }
         esrNonce = idata.esr_nonce; esrVersion = (esrVersion || 0) + 1;
+        if (result && result.state !== undefined) {
+          familyState = result.state;
+          OptimisticCache.setState(familyId, familyState);
+        }
         _queue.shift(); _saveQueue(); _queueErr = 0; updateSyncUI(); render();
       } catch(e){
         job.tries = (job.tries || 0) + 1;
@@ -730,7 +734,7 @@ async function drainQueue(){
           useSession = false; continue;
         }
         if (job.tries < 3){ _saveQueue(); updateSyncUI(); await sleep(4000); }
-        else { _queueErr++; _queue.shift(); _saveQueue(); updateSyncUI(); render(); }
+        else { _queueErr++; _queue.shift(); _saveQueue(); updateSyncUI(); render(); showToast('Action dropped after 3 failures: ' + (job.action || 'unknown')); }
       }
     }
   } finally {
@@ -756,7 +760,7 @@ async function executeIntent(action, intentData) {
        the same nonce → rejected as a duplicate, state untouched. */
     if (!window.EthernityRunner) throw new Error('Enclave unavailable — cannot commit. Please reload.');
     var _onNonce = esrNonce || 0;
-    try { var _n = await window.EthernityRunner.nonce(familyId); if (_n != null) _onNonce = _n; }
+    try { var _n = await window.EthernityRunner.nonce(familyId); if (_n != null) _onNonce = Math.max(_onNonce, _n); }
     catch(_e) { console.warn('nonce() read failed, using tracked:', _e.message); }
     intentData.esr_nonce = _onNonce + 1;
     var intent = await signIntent(action, intentData);
@@ -1409,7 +1413,7 @@ async function cashOut() {
   if (b <= 0) return;
   if (!confirm('Cash out \u20AC' + (b / 10).toFixed(2) + '? This will reset your star balance.')) return;
   try {
-    enqueueAction('withdraw', { points: b, euros: (b / 10).toFixed(2), date: today() });
+    enqueueAction('withdraw', { points: b, euros: parseFloat((b / 10).toFixed(2)), date: today() });
     confetti();
     render();
     showToast('\uD83D\uDCB0 Cashed out \u20AC' + (b / 10).toFixed(2) + '!');

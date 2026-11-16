@@ -138,10 +138,17 @@ def add_task(state: dict, intent: dict, signer: str) -> dict:
         raise ValueError(f"Invalid task ID format: {task['id']!r}")
     if len(str(task.get("name", ""))) > _MAX_NAME_LEN:
         raise ValueError(f"Task name too long (max {_MAX_NAME_LEN} chars)")
+    if not isinstance(task.get("points"), (int, float)) or task["points"] < 0:
+        raise ValueError(f"Invalid points value: {task.get('points')!r}")
+    if not isinstance(task.get("mandatory"), bool):
+        raise ValueError(f"mandatory must be a boolean, got {type(task.get('mandatory')).__name__}")
+    if not isinstance(task.get("emoji"), str) or len(task["emoji"]) > 10:
+        raise ValueError("emoji must be a string of at most 10 characters")
     existing_ids = {t["id"] for t in state.get("tasks", [])}
     if task["id"] in existing_ids:
         raise ValueError(f"Task ID already exists: {task['id']}")
-    state.setdefault("tasks", []).append(task)
+    clean_task = {k: task[k] for k in ("id", "name", "emoji", "points", "mandatory")}
+    state.setdefault("tasks", []).append(clean_task)
     return state
 
 

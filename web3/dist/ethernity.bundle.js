@@ -128841,10 +128841,14 @@ ${message.length}`, "utf-8");
     const data = typeof envelope === "string" ? envelope : JSON.stringify(envelope);
     await _session.sendInput(data);
     const timeoutMs = Math.max(3e4, (_session.deadline || Date.now() + 12e4) - Date.now());
+    let tid;
     const [msg] = await Promise.race([
       _session.waitOutputs(1),
-      new Promise((_, reject) => setTimeout(() => reject(new Error("Session response timed out")), timeoutMs))
+      new Promise((_, reject) => {
+        tid = setTimeout(() => reject(new Error("Session response timed out")), timeoutMs);
+      })
     ]);
+    clearTimeout(tid);
     let parsed = msg;
     try {
       parsed = typeof msg === "string" ? JSON.parse(msg) : msg;
@@ -128876,6 +128880,12 @@ ${message.length}`, "utf-8");
     return s.close();
   }
   function resetRunner() {
+    if (_session && !_session.closed) {
+      try {
+        _session.close();
+      } catch (e) {
+      }
+    }
     _runner = null;
     _runnerKey = null;
     _session = null;
