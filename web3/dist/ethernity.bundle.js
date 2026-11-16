@@ -128715,28 +128715,41 @@ ${message.length}`, "utf-8");
     }
     return _runner;
   }
+  var _approvePromise = null;
   async function ensureAllowance() {
     if (_approved) return;
+    if (_approvePromise) return _approvePromise;
     const key = window._bloxbergPrivateKey;
     if (!key) return;
+    _approvePromise = _doApprove(key);
     try {
-      const runner = getRunner2();
-      await runner.resolveNetworkContext();
-      const signer = runner.protocolContract.getSigner();
-      const token = new ethers_exports.Contract(TETNY_TOKEN, APPROVE_ABI, signer);
-      const address = await signer.getAddress();
-      const current = await token.allowance(address, POX_1_2);
-      console.log("[starchart] current tETNY allowance:", current.toString());
-      if (current.lt(ethers_exports.utils.parseEther("10"))) {
-        console.log("[starchart] approving tETNY for PoX 1.2...");
-        const tx = await token.approve(POX_1_2, ethers_exports.constants.MaxUint256);
-        console.log("[starchart] approve tx:", tx.hash);
-        await tx.wait();
-        console.log("[starchart] tETNY approved for PoX 1.2");
+      await _approvePromise;
+    } finally {
+      _approvePromise = null;
+    }
+  }
+  async function _doApprove(key) {
+    try {
+      const provider = new ethers_exports.providers.StaticJsonRpcProvider("https://bloxberg.ethernity.cloud", { chainId: 8995, name: "bloxberg" });
+      const wallet = new ethers_exports.Wallet(key, provider);
+      const iface = new ethers_exports.utils.Interface(APPROVE_ABI);
+      const allowanceData = iface.encodeFunctionData("allowance", [wallet.address, POX_1_2]);
+      const rawAllowance = await provider.call({ to: TETNY_TOKEN, data: allowanceData });
+      const current = ethers_exports.BigNumber.from(rawAllowance);
+      console.log("[starchart] tETNY allowance:", ethers_exports.utils.formatEther(current));
+      if (current.gte(ethers_exports.utils.parseEther("10"))) {
+        _approved = true;
+        return;
       }
-      _approved = true;
+      console.log("[starchart] sending tETNY approve for PoX 1.2...");
+      const approveData = iface.encodeFunctionData("approve", [POX_1_2, ethers_exports.constants.MaxUint256]);
+      const tx = await wallet.sendTransaction({ to: TETNY_TOKEN, data: approveData, gasLimit: 6e4 });
+      console.log("[starchart] approve tx:", tx.hash);
+      const receipt = await tx.wait();
+      console.log("[starchart] approve confirmed, status:", receipt.status);
+      _approved = receipt.status === 1;
     } catch (e) {
-      console.warn("[starchart] tETNY approval failed:", e.message, e);
+      console.error("[starchart] tETNY approval error:", e);
     }
   }
   function enclaveAddress() {
