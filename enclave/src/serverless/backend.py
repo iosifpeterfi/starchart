@@ -18,6 +18,7 @@ leaves the enclave.
 from __future__ import annotations
 
 import json
+import logging
 import re
 import time
 
@@ -58,7 +59,7 @@ def recover_signer(intent: dict) -> str:
     The signature covers the JSON-serialized intent without the 'signature' field.
     """
     sig = intent.pop("signature")
-    message_text = json.dumps(intent, separators=(",", ":"), sort_keys=True)
+    message_text = json.dumps(intent, separators=(",", ":"), sort_keys=True, ensure_ascii=False)
     intent["signature"] = sig  # restore
 
     w3 = Web3()
@@ -206,6 +207,8 @@ def remove_member(state: dict, intent: dict, signer: str) -> dict:
 #  Action dispatch
 # ─────────────────────────────────────────────────────────────────────
 
+# invite_member/remove_member entries are for validation only — execute()
+# special-cases them with an atomic ACL+data commit via _commit_transform.
 ACTIONS = {
     "create_family": create_family,
     "complete_chore": complete_chore,
@@ -417,11 +420,14 @@ def ___etny_on_input___(data):
         if op == "migrate":
             intent = json.loads(intent_json) if isinstance(intent_json, str) else intent_json
             signer = recover_signer(intent)
-            from ecld_state import StateRegistry
+            from ecld_state import StateRegistry, _task_caller
             _pre = StateRegistry().get(family_id)
             if _pre:
                 validate_owner(_pre, signer)
-            bound = env.get("bound", "0")
+            elif _task_caller and signer.lower() != _task_caller.lower():
+                raise PermissionError(
+                    f"Signer {signer} does not match the task caller for new-state migration")
+            bound = intent.get("bound", env.get("bound", "0"))
             result = migrate_state(family_id, bound)
             result["signer"] = signer
         elif op == "read":
@@ -465,8 +471,8 @@ def migrate_state(family_id: str, bound: str) -> dict:
         head = int(state._contract().w3.eth.block_number)
         if bound_int > head:
             bound_int = head
-    except Exception:
-        pass
+    except Exception as e:
+        logging.warning("migrate_state: could not clamp bound to chain head: %s", e)
 
     target_kh = _key_hash(family_id)
     ledger = state.fence(bound_int, key_filter={target_kh})

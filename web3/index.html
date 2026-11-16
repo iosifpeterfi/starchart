@@ -498,9 +498,19 @@ var OptimisticCache = {
    real IPFS hash instead of a state fingerprint.
    =================================================================== */
 
+function canonicalJson(obj) {
+  return JSON.stringify(obj, function(key, value) {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      var sorted = {};
+      Object.keys(value).sort().forEach(function(k) { sorted[k] = value[k]; });
+      return sorted;
+    }
+    return value;
+  });
+}
+
 function stateHash(state) {
-  var json = JSON.stringify(state, Object.keys(state).sort());
-  return ethers.keccak256(ethers.toUtf8Bytes(json));
+  return ethers.keccak256(ethers.toUtf8Bytes(canonicalJson(state)));
 }
 
 /* ===================================================================
@@ -510,7 +520,7 @@ function stateHash(state) {
    =================================================================== */
 async function signIntent(action, intentData) {
   var intent = Object.assign({action: action}, intentData);
-  var message = JSON.stringify(intent, Object.keys(intent).sort());
+  var message = canonicalJson(intent);
   var signature = await userWallet.signer.signMessage(message);
   intent.signature = signature;
   return intent;
@@ -744,8 +754,13 @@ async function drainQueue(){
 
 var _suppressWriteToast = false; /* set by callers that show their own progress UI (e.g. invite spinner) */
 async function executeIntent(action, intentData) {
+  if (_queueRunning) {
+    await new Promise(function(resolve) {
+      var check = setInterval(function() { if (!_queueRunning) { clearInterval(check); resolve(); } }, 200);
+    });
+  }
   setSyncDot('yellow spin');
-  _activeWrite = true; /* pause reconcile until this write fully returns */
+  _activeWrite = true;
   try {
     /* Attach current nonce so the enclave can validate ordering */
     if (action !== 'create_family' && familyState) {
@@ -960,6 +975,7 @@ async function doLoginWallet() {
 function doLogin() { doLoginWeb3Auth(); }
 
 async function doLogout() {
+  if (_queue.length && !confirm('You have ' + _queue.length + ' unsent change(s). Logging out will discard them. Continue?')) return;
   try { if (window.EthernityRunner && window.EthernityRunner.hasActiveSession()) await window.EthernityRunner.closeSession(); } catch(e){ console.warn('session close on logout:', e.message); }
   _queue = []; _saveQueue(); _queueRunning = false; _queueErr = 0;
   esrVersion = 0; esrNonce = 0;
@@ -1571,10 +1587,12 @@ async function refreshFamilyPanel(){
     var ri = await signIntent('read_family', {});
     var rr = await window.EthernityRunner.submitRead(familyId, ri, function(){});
     if (rr && rr.state && rr.state.members) {
-      familyState = rr.state;
       if (rr.version != null) esrVersion = rr.version;
       if (rr.nonce != null) esrNonce = rr.nonce;
-      OptimisticCache.setState(familyId, familyState); /* keep the render cache aligned with truth */
+      if (!_queue.length && !_queueRunning) {
+        familyState = rr.state;
+        OptimisticCache.setState(familyId, familyState);
+      }
       var overlay = document.getElementById('syncOverlay');
       if (sig() !== before && overlay && overlay.classList.contains('active')) {
         /* preserve anything the owner is mid-typing before repainting */
@@ -1660,12 +1678,14 @@ async function manualSync() {
     var ri = await signIntent('read_family', {});
     var r = await window.EthernityRunner.submitRead(familyId, ri, function(){});
     if (r && r.state && Object.keys(r.state).length) {
-      familyState = r.state;
       if (r.version != null) esrVersion = r.version;
       if (r.nonce != null) esrNonce = r.nonce;
-      OptimisticCache.setState(familyId, familyState);
+      if (!_queue.length && !_queueRunning) {
+        familyState = r.state;
+        OptimisticCache.setState(familyId, familyState);
+      }
       render();
-      showToast('Up to date (v' + esrVersion + ')');
+      showToast(_queue.length ? 'Synced version (queue still draining)' : 'Up to date (v' + esrVersion + ')');
     } else {
       showToast('No state found on chain for this family');
     }

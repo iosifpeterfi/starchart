@@ -128718,9 +128718,21 @@ ${message.length}`, "utf-8");
     const w = runner._esrWalletMemo && runner._esrWalletMemo[ENCLAVE_CONFIG.secureLockEnclave];
     if (w) localStorage.setItem(WALLET_LS_KEY, w);
   }
+  function canonicalJson(obj) {
+    return JSON.stringify(obj, function(key, value) {
+      if (value && typeof value === "object" && !Array.isArray(value)) {
+        var sorted = {};
+        Object.keys(value).sort().forEach(function(k) {
+          sorted[k] = value[k];
+        });
+        return sorted;
+      }
+      return value;
+    });
+  }
   function intentToCode(fn, familyId, signedIntent) {
     if (!/^[0-9a-f]+$/.test(familyId)) throw new Error("Invalid family ID format");
-    const intentJson = JSON.stringify(signedIntent, Object.keys(signedIntent).sort());
+    const intentJson = canonicalJson(signedIntent);
     const safe = intentJson.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
     return `ecld_result(${fn}("${familyId}", '${safe}'))`;
   }
@@ -128837,27 +128849,38 @@ ${message.length}`, "utf-8");
     return { orderId: _session.orderId, deadline: _session.deadline };
   }
   async function sendSessionInput(envelope) {
-    if (!_session || _session.closed) throw new Error("No active session \u2014 call startSession first");
+    const sess = _session;
+    if (!sess || sess.closed) throw new Error("No active session \u2014 call startSession first");
     const data = typeof envelope === "string" ? envelope : JSON.stringify(envelope);
-    await _session.sendInput(data);
-    const timeoutMs = Math.max(3e4, (_session.deadline || Date.now() + 12e4) - Date.now());
+    const timeoutMs = Math.max(3e4, (sess.deadline || Date.now() + 12e4) - Date.now());
     let tid;
-    const [msg] = await Promise.race([
-      _session.waitOutputs(1),
-      new Promise((_, reject) => {
-        tid = setTimeout(() => reject(new Error("Session response timed out")), timeoutMs);
-      })
-    ]);
-    clearTimeout(tid);
-    let parsed = msg;
+    const timeoutPromise = new Promise((_, reject) => {
+      tid = setTimeout(() => reject(new Error("Session response timed out")), timeoutMs);
+    });
     try {
-      parsed = typeof msg === "string" ? JSON.parse(msg) : msg;
+      await Promise.race([sess.sendInput(data), timeoutPromise]);
+      const [msg] = await Promise.race([sess.waitOutputs(1), timeoutPromise]);
+      clearTimeout(tid);
+      let parsed = msg;
+      try {
+        parsed = typeof msg === "string" ? JSON.parse(msg) : msg;
+      } catch (e) {
+      }
+      if (parsed && parsed.version != null && parsed.family_id) {
+        _lastVersion[parsed.family_id] = parsed.version;
+      }
+      return parsed;
     } catch (e) {
+      clearTimeout(tid);
+      if (/timed out/i.test(e.message)) {
+        try {
+          sess.close();
+        } catch (_) {
+        }
+        if (_session === sess) _session = null;
+      }
+      throw e;
     }
-    if (parsed && parsed.version != null && parsed.family_id) {
-      _lastVersion[parsed.family_id] = parsed.version;
-    }
-    return parsed;
   }
   async function sessionExecute(familyId, signedIntent) {
     return sendSessionInput({
@@ -128877,14 +128900,20 @@ ${message.length}`, "utf-8");
     if (!_session) return null;
     const s = _session;
     _session = null;
-    return s.close();
+    try {
+      await Promise.race([
+        s.close(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Session close timed out")), 15e3))
+      ]);
+    } catch (e) {
+      console.warn("closeSession:", e.message);
+    }
+    return null;
   }
   function resetRunner() {
     if (_session && !_session.closed) {
-      try {
-        _session.close();
-      } catch (e) {
-      }
+      Promise.resolve(_session.close()).catch(function() {
+      });
     }
     _runner = null;
     _runnerKey = null;
