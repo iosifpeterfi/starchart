@@ -23,11 +23,11 @@ const ENCLAVE_CONFIG = {
   trustedZoneEnclave: 'etny-pynithy-testnet',
   nodeAddress: '0x837EA0A09612CFF93a787db84Bbe11c65E431133',
   registryAddress: '0x0Ea1728EAE108FD3B9340ae91451348E2Cc6b4E4', // ESR registry (Bloxberg testnet) — nonce now public on-chain (getNonce)
-  // enclave ESR identity for the CURRENTLY published build (v70, PoX 1.2). It rotates on
+  // enclave ESR identity for the CURRENTLY published build (v72, PoX 1.2). It rotates on
   // every rebuild (new MRENCLAVE) — update after each publish (it's in the publish banner
   // and .config.json ESR.wallet_address). Seeds cold-start reads/version/nonce before any
   // write has taught the runner the address; a live write overwrites it via the result envelope.
-  enclaveAddress: '0x6AE9190707b11824ED043CaBAF90BFf1742b482d',
+  enclaveAddress: '0x9B576CCBC66ECF4a9e15f39C97fc154C1d23f842',
   resources: {
     taskPrice: 3,
     cpu: 1,
