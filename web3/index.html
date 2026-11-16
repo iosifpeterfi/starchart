@@ -1024,7 +1024,7 @@ async function doLogout() {
     await new Promise(function(r) { var c = setInterval(function() { if (!_queueRunning) { clearInterval(c); r(); } }, 200); });
   }
   try { if (window.EthernityRunner && window.EthernityRunner.hasActiveSession()) await window.EthernityRunner.closeSession(); } catch(e){ console.warn('session close on logout:', e.message); }
-  _queue = []; _saveQueue(); _queueRunning = false; _queueErr = 0;
+  _queue = []; _saveQueue(); _queueRunning = false; _activeWrite = false; _queueErr = 0;
   esrVersion = 0; esrNonce = 0;
   window._bloxbergPrivateKey = null;
   window._lastSession = null;

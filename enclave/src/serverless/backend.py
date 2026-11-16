@@ -261,7 +261,9 @@ def execute(family_id: str, intent_json: str) -> dict:
     if action not in ACTIONS:
         raise ValueError(f"Unknown action: {action}")
 
-    if intent.get("family_id") and intent["family_id"] != family_id:
+    if not intent.get("family_id"):
+        raise ValueError("Intent must include family_id for cross-family replay protection")
+    if intent["family_id"] != family_id:
         raise ValueError(
             f"Intent bound to family {intent['family_id']} but submitted to {family_id}")
 
