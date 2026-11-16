@@ -147,17 +147,28 @@ def add_task(state: dict, intent: dict, signer: str) -> dict:
 
 def remove_task(state: dict, intent: dict, signer: str) -> dict:
     validate_membership(state, signer)
-    task_id = intent["task_id"]
+    task_id = str(intent["task_id"])
+    if not _VALID_ID.match(task_id):
+        raise ValueError(f"Invalid task_id format: {task_id!r}")
     state["tasks"] = [t for t in state.get("tasks", []) if t["id"] != task_id]
     return state
 
 
 def withdraw(state: dict, intent: dict, signer: str) -> dict:
     validate_membership(state, signer)
+    date = str(intent["date"])
+    if not _VALID_DATE.match(date):
+        raise ValueError(f"Invalid date format: {date!r}")
+    points = intent["points"]
+    euros = intent["euros"]
+    if not isinstance(points, (int, float)) or points < 0:
+        raise ValueError(f"Invalid points value: {points!r}")
+    if not isinstance(euros, (int, float)) or euros < 0:
+        raise ValueError(f"Invalid euros value: {euros!r}")
     state.setdefault("withdrawals", []).append({
-        "points": intent["points"],
-        "euros": intent["euros"],
-        "date": intent["date"],
+        "points": points,
+        "euros": euros,
+        "date": date,
         "timestamp": int(time.time()),
         "by": signer,
     })
@@ -403,9 +414,8 @@ def ___etny_on_input___(data):
             _pre = StateRegistry().get(family_id)
             if _pre:
                 validate_owner(_pre, signer)
-            old_enclave = env.get("old_enclave", "")
             bound = env.get("bound", "0")
-            result = migrate_state(family_id, old_enclave, bound)
+            result = migrate_state(family_id, bound)
             result["signer"] = signer
         elif op == "read":
             result = read_family(family_id, intent_json)
@@ -427,22 +437,20 @@ def ___etny_on_input___(data):
 # ─────────────────────────────────────────────────────────────────────
 
 
-def migrate_state(family_id: str, old_enclave: str, bound: str) -> dict:
-    """Migrate a family's state from a previous enclave version to the current one.
+def migrate_state(family_id: str, bound: str) -> dict:
+    """Migrate a family's state under the current enclave identity.
 
-    Uses the ESR fence mechanism: reads the old enclave's state as of `bound`
-    (a block number) and re-commits it under the current enclave's identity.
+    Uses the ESR fence mechanism: re-reads the family's state as of `bound`
+    (a block number) and re-commits it. Scoped to the single family_id key
+    so other keys under this identity are not affected.
+
+    Same-identity only: the fence reads keys belonging to the current
+    enclave wallet. Cross-enclave migration (reading a different wallet's
+    keys) requires a separate mechanism.
+
     The caller must be the task payer (authenticated via task_caller).
-
-    Args:
-        family_id:   The ESR key to migrate
-        old_enclave: The old enclave's ESR wallet address (e.g. "0x793305cf...")
-        bound:       Block number at which to read the old state (string or int)
-
-    Returns:
-        Migration result with old/new enclave addresses and the migrated state.
     """
-    from ecld_state import StateRegistry
+    from ecld_state import StateRegistry, _key_hash
 
     state = StateRegistry()
     bound_int = int(bound)
@@ -453,7 +461,8 @@ def migrate_state(family_id: str, old_enclave: str, bound: str) -> dict:
     except Exception:
         pass
 
-    ledger = state.fence(bound_int)
+    target_kh = _key_hash(family_id)
+    ledger = state.fence(bound_int, key_filter={target_kh})
 
     if not ledger:
         old_state = state.get(family_id)
@@ -473,10 +482,8 @@ def migrate_state(family_id: str, old_enclave: str, bound: str) -> dict:
             "family_id": family_id,
             "message": f"No writable keys found at block {bound_int}",
             "enclave_address": state.enclave_address,
-            "old_enclave": old_enclave,
         }
 
-    migrated_keys = [entry for entry in ledger]
     current_state = state.get(family_id)
 
     return {
@@ -484,9 +491,8 @@ def migrate_state(family_id: str, old_enclave: str, bound: str) -> dict:
         "action": "migrate_state",
         "family_id": family_id,
         "enclave_address": state.enclave_address,
-        "old_enclave": old_enclave,
         "bound": bound_int,
-        "migrated_keys": len(migrated_keys),
+        "migrated_keys": len(ledger),
         "version": state.get_version(family_id),
         "state": current_state,
     }
