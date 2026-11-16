@@ -128712,27 +128712,28 @@ ${message.length}`, "utf-8");
         _runner._esrWalletMemo = _runner._esrWalletMemo || {};
         _runner._esrWalletMemo[ENCLAVE_CONFIG.secureLockEnclave] = w;
       }
-      if (!_approved && key) {
-        (async () => {
-          try {
-            const provider = new ethers_exports.providers.JsonRpcProvider("https://bloxberg.ethernity.cloud");
-            const signer = new ethers_exports.Wallet(key, provider);
-            const token = new ethers_exports.Contract(TETNY_TOKEN, APPROVE_ABI, signer);
-            const current = await token.allowance(signer.address, POX_1_2);
-            if (current.lt(ethers_exports.utils.parseEther("10"))) {
-              console.log("[starchart] approving tETNY for PoX 1.2...");
-              const tx = await token.approve(POX_1_2, ethers_exports.constants.MaxUint256);
-              await tx.wait();
-              console.log("[starchart] tETNY approved for PoX 1.2");
-            }
-            _approved = true;
-          } catch (e) {
-            console.warn("[starchart] tETNY approval failed:", e.message);
-          }
-        })();
-      }
     }
     return _runner;
+  }
+  async function ensureAllowance() {
+    if (_approved) return;
+    const key = window._bloxbergPrivateKey;
+    if (!key) return;
+    try {
+      const provider = new ethers_exports.providers.JsonRpcProvider("https://bloxberg.ethernity.cloud");
+      const signer = new ethers_exports.Wallet(key, provider);
+      const token = new ethers_exports.Contract(TETNY_TOKEN, APPROVE_ABI, signer);
+      const current = await token.allowance(signer.address, POX_1_2);
+      if (current.lt(ethers_exports.utils.parseEther("10"))) {
+        console.log("[starchart] approving tETNY for PoX 1.2...");
+        const tx = await token.approve(POX_1_2, ethers_exports.constants.MaxUint256);
+        await tx.wait();
+        console.log("[starchart] tETNY approved for PoX 1.2");
+      }
+      _approved = true;
+    } catch (e) {
+      console.warn("[starchart] tETNY approval failed:", e.message);
+    }
   }
   function enclaveAddress() {
     return localStorage.getItem(WALLET_LS_KEY) || ENCLAVE_CONFIG.enclaveAddress || null;
@@ -128790,6 +128791,7 @@ ${message.length}`, "utf-8");
     });
   }
   async function submitTask(familyId, signedIntent, onProgress) {
+    await ensureAllowance();
     const runner = getRunner2();
     const result2 = await runToCompletion(runner, intentToCode("execute", familyId, signedIntent), onProgress);
     if (result2 && result2.version != null) _lastVersion[familyId] = result2.version;
@@ -128852,6 +128854,7 @@ ${message.length}`, "utf-8");
   }
   var _session = null;
   async function startSession(onProgress) {
+    await ensureAllowance();
     if (_session && !_session.closed) {
       try {
         await Promise.race([

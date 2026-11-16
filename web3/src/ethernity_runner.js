@@ -64,29 +64,29 @@ function getRunner() {
       _runner._esrWalletMemo = _runner._esrWalletMemo || {};
       _runner._esrWalletMemo[ENCLAVE_CONFIG.secureLockEnclave] = w;
     }
-    // PoX 1.2 on bloxberg requires tETNY approval — the JS runner skips it
-    // for bloxberg (family !== 'ecld'). Manual approve once per session.
-    if (!_approved && key) {
-      (async () => {
-        try {
-          const provider = new ethers.providers.JsonRpcProvider('https://bloxberg.ethernity.cloud');
-          const signer = new ethers.Wallet(key, provider);
-          const token = new ethers.Contract(TETNY_TOKEN, APPROVE_ABI, signer);
-          const current = await token.allowance(signer.address, POX_1_2);
-          if (current.lt(ethers.utils.parseEther('10'))) {
-            console.log('[starchart] approving tETNY for PoX 1.2...');
-            const tx = await token.approve(POX_1_2, ethers.constants.MaxUint256);
-            await tx.wait();
-            console.log('[starchart] tETNY approved for PoX 1.2');
-          }
-          _approved = true;
-        } catch (e) {
-          console.warn('[starchart] tETNY approval failed:', e.message);
-        }
-      })();
-    }
   }
   return _runner;
+}
+
+async function ensureAllowance() {
+  if (_approved) return;
+  const key = window._bloxbergPrivateKey;
+  if (!key) return;
+  try {
+    const provider = new ethers.providers.JsonRpcProvider('https://bloxberg.ethernity.cloud');
+    const signer = new ethers.Wallet(key, provider);
+    const token = new ethers.Contract(TETNY_TOKEN, APPROVE_ABI, signer);
+    const current = await token.allowance(signer.address, POX_1_2);
+    if (current.lt(ethers.utils.parseEther('10'))) {
+      console.log('[starchart] approving tETNY for PoX 1.2...');
+      const tx = await token.approve(POX_1_2, ethers.constants.MaxUint256);
+      await tx.wait();
+      console.log('[starchart] tETNY approved for PoX 1.2');
+    }
+    _approved = true;
+  } catch (e) {
+    console.warn('[starchart] tETNY approval failed:', e.message);
+  }
 }
 
 function enclaveAddress() {
@@ -154,6 +154,7 @@ function runToCompletion(runner, code, onProgress) {
  * Returns the enclave's execute() result { status, state, version, nonce, ... }.
  */
 async function submitTask(familyId, signedIntent, onProgress) {
+  await ensureAllowance();
   const runner = getRunner();
   const result = await runToCompletion(runner, intentToCode('execute', familyId, signedIntent), onProgress);
   if (result && result.version != null) _lastVersion[familyId] = result.version;
@@ -240,6 +241,7 @@ async function waitForVersion(familyId, sinceVersion, timeoutMs) {
 let _session = null;
 
 async function startSession(onProgress) {
+  await ensureAllowance();
   if (_session && !_session.closed) {
     try {
       await Promise.race([
