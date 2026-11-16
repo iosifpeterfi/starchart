@@ -711,7 +711,11 @@ async function ensureSession(){
 }
 
 async function drainQueue(){
-  if (_queueRunning || _activeWrite || !window.EthernityRunner || !userWallet || !_queue.length) return;
+  if (_queueRunning || _activeWrite || !window.EthernityRunner || !userWallet || !_queue.length) {
+    if (_queue.length) console.log('[drain] skipped: running=' + _queueRunning + ' activeWrite=' + _activeWrite + ' queue=' + _queue.length);
+    return;
+  }
+  console.log('[drain] starting, queue length:', _queue.length);
   _queueRunning = true; _activeWrite = true; updateSyncUI();
   try {
     var useSession = await ensureSession();
@@ -730,9 +734,14 @@ async function drainQueue(){
         var intent = await signIntent(job.action, idata);
         var result;
         if (useSession && window.EthernityRunner.hasActiveSession()) {
-          result = await window.EthernityRunner.sessionExecute(familyId, intent);
+          console.log('[drain] sending via session...');
+          var sessionTimeout = new Promise(function(_, rej) { setTimeout(function(){ rej(new Error('session response timeout 60s')); }, 60000); });
+          result = await Promise.race([window.EthernityRunner.sessionExecute(familyId, intent), sessionTimeout]);
+          console.log('[drain] session response:', result && result.status);
         } else {
+          console.log('[drain] sending via one-shot task...');
           result = await window.EthernityRunner.submitTask(familyId, intent, function(){});
+          console.log('[drain] task response:', result && result.status);
         }
         var resStr = (typeof result === 'string') ? result : JSON.stringify(result || '');
         if (/ESR_NONCE_VIOLATION/i.test(resStr) || (result && result.code === 36)) {
