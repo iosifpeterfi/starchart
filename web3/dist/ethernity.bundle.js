@@ -128831,20 +128831,36 @@ ${message.length}`, "utf-8");
   async function startSession(onProgress) {
     if (_session && !_session.closed) {
       try {
-        await _session.close();
+        await Promise.race([
+          _session.close(),
+          new Promise((_, r) => setTimeout(() => r(new Error("stale close timeout")), 15e3))
+        ]);
       } catch (e) {
       }
       _session = null;
     }
     const runner = getRunner2();
     const code14 = "___etny_on_input___";
-    _session = await runner.runSession(
-      ENCLAVE_CONFIG.resources,
-      ENCLAVE_CONFIG.secureLockEnclave,
-      code14,
-      ENCLAVE_CONFIG.nodeAddress,
-      ENCLAVE_CONFIG.trustedZoneEnclave
-    );
+    const listeners = [];
+    if (onProgress) {
+      for (const evtName of Object.values(ECStatus)) {
+        const fn = (e) => onProgress(e.detail || { message: runner.progress });
+        runner.addEventListener(evtName, fn);
+        listeners.push([evtName, fn]);
+      }
+    }
+    const cleanupListeners = () => listeners.forEach(([n2, fn]) => runner.removeEventListener(n2, fn));
+    try {
+      _session = await runner.runSession(
+        ENCLAVE_CONFIG.resources,
+        ENCLAVE_CONFIG.secureLockEnclave,
+        code14,
+        ENCLAVE_CONFIG.nodeAddress,
+        ENCLAVE_CONFIG.trustedZoneEnclave
+      );
+    } finally {
+      cleanupListeners();
+    }
     persistWallet(runner);
     return { orderId: _session.orderId, deadline: _session.deadline };
   }
@@ -128874,7 +128890,7 @@ ${message.length}`, "utf-8");
       clearTimeout(tid);
       if (/timed out/i.test(e.message)) {
         try {
-          sess.close();
+          await Promise.race([sess.close(), new Promise((_, r) => setTimeout(() => r(), 5e3))]);
         } catch (_) {
         }
         if (_session === sess) _session = null;
@@ -128923,7 +128939,14 @@ ${message.length}`, "utf-8");
     });
   }
   function hasActiveSession() {
-    return _session !== null && !_session.closed;
+    if (!_session || _session.closed) return false;
+    if (_session.deadline && Date.now() > _session.deadline) {
+      Promise.resolve(_session.close()).catch(function() {
+      });
+      _session = null;
+      return false;
+    }
+    return true;
   }
   window.EthernityRunner = {
     submitTask,

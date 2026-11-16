@@ -27,6 +27,7 @@ from web3 import Web3
 
 _VALID_ID = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
 _VALID_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_VALID_ETH_ADDR = re.compile(r"^0x[0-9a-fA-F]{40}$")
 _MAX_NAME_LEN = 100
 
 # ─────────────────────────────────────────────────────────────────────
@@ -162,8 +163,23 @@ def remove_task(state: dict, intent: dict, signer: str) -> dict:
     return state
 
 
+def _earned_points(state: dict) -> float:
+    """Sum of all earned points from completed optional chores."""
+    total = 0.0
+    task_map = {t["id"]: t for t in state.get("tasks", [])}
+    for date_chores in state.get("days", {}).values():
+        for chore_id, done in date_chores.items():
+            if done and chore_id in task_map:
+                total += task_map[chore_id].get("points", 0)
+    return total
+
+
+def _withdrawn_points(state: dict) -> float:
+    return sum(w.get("points", 0) for w in state.get("withdrawals", []))
+
+
 def withdraw(state: dict, intent: dict, signer: str) -> dict:
-    validate_membership(state, signer)
+    validate_owner(state, signer)
     date = str(intent["date"])
     if not _VALID_DATE.match(date):
         raise ValueError(f"Invalid date format: {date!r}")
@@ -173,6 +189,9 @@ def withdraw(state: dict, intent: dict, signer: str) -> dict:
         raise ValueError(f"Invalid points value: {points!r}")
     if not isinstance(euros, (int, float)) or euros < 0:
         raise ValueError(f"Invalid euros value: {euros!r}")
+    available = _earned_points(state) - _withdrawn_points(state)
+    if points > available:
+        raise ValueError(f"Insufficient balance: requested {points}, available {available}")
     state.setdefault("withdrawals", []).append({
         "points": points,
         "euros": euros,
@@ -186,6 +205,8 @@ def withdraw(state: dict, intent: dict, signer: str) -> dict:
 def invite_member(state: dict, intent: dict, signer: str) -> dict:
     validate_owner(state, signer)
     wallet = intent["wallet"].lower()
+    if not _VALID_ETH_ADDR.match(intent["wallet"]):
+        raise ValueError(f"Invalid wallet address: {intent['wallet']!r}")
     members = state.get("members", [])
     if wallet in [m.lower() for m in members]:
         raise ValueError("Already a member")
@@ -240,15 +261,17 @@ def execute(family_id: str, intent_json: str) -> dict:
     if action not in ACTIONS:
         raise ValueError(f"Unknown action: {action}")
 
+    if intent.get("family_id") and intent["family_id"] != family_id:
+        raise ValueError(
+            f"Intent bound to family {intent['family_id']} but submitted to {family_id}")
+
     signer = recover_signer(intent)
     action_fn = ACTIONS[action]
 
     state = StateRegistry()
-    # Exactly-once: when the client pins `esr_nonce` (last accepted + 1), a
-    # resubmit of the same intent (client retry / double-tap) is rejected with
-    # task code 36 (ESR_NONCE_VIOLATION), state untouched. Omitting it keeps the
-    # legacy behavior. Nonce must be STRICTLY GREATER than the last accepted.
     esr_nonce = intent.get("esr_nonce")
+    if action == "withdraw" and esr_nonce is None:
+        raise ValueError("withdraw requires esr_nonce for exactly-once protection")
 
     if action in ("invite_member", "remove_member"):
         # Member management changes BOTH the family's data (the members list)
@@ -412,11 +435,8 @@ def ___etny_on_input___(data):
                 "error_type": "BadEnvelope",
                 "error": "envelope needs 'family_id' and 'intent'"}
 
-    # execute()/read_family() take the intent as a JSON string and re-canonicalize
-    # it internally (recover_signer re-serializes sort_keys=True), so the exact
-    # serialization here does not affect signature recovery.
-    intent_json = json.dumps(intent, separators=(",", ":"))
     try:
+        intent_json = json.dumps(intent, separators=(",", ":"))
         if op == "migrate":
             intent = json.loads(intent_json) if isinstance(intent_json, str) else intent_json
             signer = recover_signer(intent)
@@ -463,9 +483,19 @@ def migrate_state(family_id: str, bound: str) -> dict:
 
     The caller must be the task payer (authenticated via task_caller).
     """
-    from ecld_state import StateRegistry, _key_hash
+    from ecld_state import StateRegistry, _key_hash, _task_caller
+
+    if _task_caller is None:
+        raise PermissionError("migration requires an authenticated task caller")
 
     state = StateRegistry()
+    existing = state.get(family_id)
+    if existing:
+        owner = existing.get("owner", "").lower()
+        if _task_caller.lower() != owner:
+            raise PermissionError(
+                f"caller {_task_caller} is not the family owner")
+
     bound_int = int(bound)
     try:
         head = int(state._contract().w3.eth.block_number)

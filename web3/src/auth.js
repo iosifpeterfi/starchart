@@ -185,8 +185,8 @@ const StarChartAuth = {
     if (!_ethListenersAdded) {
       _ethListenersAdded = true;
       window.ethereum.on('accountsChanged', (accs) => {
-        if (!accs.length) { _session = null; }
-        else location.reload();
+        _session = null;
+        location.reload();
       });
       window.ethereum.on('chainChanged', () => location.reload());
     }

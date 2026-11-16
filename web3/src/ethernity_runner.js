@@ -214,18 +214,36 @@ let _session = null;
 
 async function startSession(onProgress) {
   if (_session && !_session.closed) {
-    try { await _session.close(); } catch (e) { /* best-effort cleanup */ }
+    try {
+      await Promise.race([
+        _session.close(),
+        new Promise((_, r) => setTimeout(() => r(new Error('stale close timeout')), 15000)),
+      ]);
+    } catch (e) { /* best-effort cleanup */ }
     _session = null;
   }
   const runner = getRunner();
   const code = '___etny_on_input___';
-  _session = await runner.runSession(
-    ENCLAVE_CONFIG.resources,
-    ENCLAVE_CONFIG.secureLockEnclave,
-    code,
-    ENCLAVE_CONFIG.nodeAddress,
-    ENCLAVE_CONFIG.trustedZoneEnclave,
-  );
+  const listeners = [];
+  if (onProgress) {
+    for (const evtName of Object.values(ECStatus)) {
+      const fn = (e) => onProgress(e.detail || { message: runner.progress });
+      runner.addEventListener(evtName, fn);
+      listeners.push([evtName, fn]);
+    }
+  }
+  const cleanupListeners = () => listeners.forEach(([n, fn]) => runner.removeEventListener(n, fn));
+  try {
+    _session = await runner.runSession(
+      ENCLAVE_CONFIG.resources,
+      ENCLAVE_CONFIG.secureLockEnclave,
+      code,
+      ENCLAVE_CONFIG.nodeAddress,
+      ENCLAVE_CONFIG.trustedZoneEnclave,
+    );
+  } finally {
+    cleanupListeners();
+  }
   persistWallet(runner);
   return { orderId: _session.orderId, deadline: _session.deadline };
 }
@@ -252,7 +270,9 @@ async function sendSessionInput(envelope) {
   } catch (e) {
     clearTimeout(tid);
     if (/timed out/i.test(e.message)) {
-      try { sess.close(); } catch (_) {}
+      try {
+        await Promise.race([sess.close(), new Promise((_, r) => setTimeout(() => r(), 5000))]);
+      } catch (_) { /* best-effort */ }
       if (_session === sess) _session = null;
     }
     throw e;
@@ -301,7 +321,13 @@ function resetRunner() {
 }
 
 function hasActiveSession() {
-  return _session !== null && !_session.closed;
+  if (!_session || _session.closed) return false;
+  if (_session.deadline && Date.now() > _session.deadline) {
+    Promise.resolve(_session.close()).catch(function() {});
+    _session = null;
+    return false;
+  }
+  return true;
 }
 
 // Expose globally
