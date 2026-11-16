@@ -1,0 +1,1828 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.hcaptcha.com https://*.hcaptcha.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src https: data: blob:; connect-src https: wss: blob:; frame-src https://auth.web3auth.io https://*.web3auth.io https://*.hcaptcha.com; object-src 'none'; base-uri 'none'; form-action 'self'; upgrade-insecure-requests; frame-ancestors 'none'">
+<title>Star Chart Web3</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{--orange:#FF9B35;--yellow:#FFEE3F;--green:#4CAF50;--bg:#FFF8E7;--card:#FFFFFF;--dark:#333333;--muted:#999999;--mandatory-bg:#FFF4E0;--done-bg:#DCEDC8;--locked-bg:#FBE9E7}
+html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--dark);touch-action:manipulation}
+
+.fullscreen{position:fixed;top:0;left:0;right:0;bottom:0;background:linear-gradient(135deg,var(--orange),var(--yellow));z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:center;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
+.fullscreen.hidden{display:none}
+.fullscreen h1{font-size:3em;margin-bottom:4px}
+.fullscreen h2{color:#fff;font-size:1.2em;margin-bottom:20px;font-weight:600}
+.fullscreen p{color:rgba(255,255,255,.85);font-size:.85em;max-width:320px;text-align:center;line-height:1.4;margin-bottom:16px}
+.setup-btn{width:280px;padding:12px;border:none;border-radius:12px;font-size:1em;font-weight:700;cursor:pointer;color:#fff;background:rgba(0,0,0,.2);margin-top:8px}
+.setup-btn:active{background:rgba(0,0,0,.35)}
+.setup-btn.google{background:#4285F4;display:flex;align-items:center;justify-content:center;gap:8px}
+.setup-error{color:#fff;font-size:.85em;margin-top:8px;min-height:20px;text-align:center;max-width:300px}
+.setup-status{color:rgba(255,255,255,.7);font-size:.75em;margin-top:6px;text-align:center}
+.wallet-badge{background:rgba(0,0,0,.15);border-radius:8px;padding:6px 12px;font-size:.75em;color:#fff;margin-top:12px;font-family:monospace;word-break:break-all;max-width:300px;text-align:center}
+
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:var(--orange);color:#fff}
+.topbar-title{font-size:1.1em;font-weight:700}
+.topbar-actions{display:flex;gap:10px;align-items:center}
+.topbar-actions button{background:none;border:none;color:#fff;font-size:1.4em;cursor:pointer;padding:4px 6px;border-radius:6px}
+.topbar-actions button:active{background:rgba(255,255,255,.3)}
+.sync-dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:2px;vertical-align:middle}
+.sync-dot.green{background:#4CAF50}.sync-dot.yellow{background:#FFEE3F}.sync-dot.red{background:#E53935}.sync-dot.grey{background:#999}
+.sync-dot.spin{animation:spin-dot .8s linear infinite}
+@keyframes spin-dot{0%{opacity:1}50%{opacity:.3}100%{opacity:1}}
+.spinner{width:46px;height:46px;margin:20px auto 8px;border:4px solid rgba(255,255,255,.25);border-top-color:#fff;border-radius:50%;animation:spin360 .9s linear infinite}
+@keyframes spin360{to{transform:rotate(360deg)}}
+.spinner-sm{width:18px;height:18px;border:3px solid rgba(0,0,0,.15);border-top-color:var(--orange);border-radius:50%;animation:spin360 .8s linear infinite;display:inline-block;flex:0 0 auto;vertical-align:middle}
+.invite-busy{display:flex;align-items:center;gap:8px;margin-top:10px}
+
+.header{background:linear-gradient(135deg,var(--orange),var(--yellow));padding:8px 16px;text-align:center;color:var(--dark)}
+.header .stars{font-size:1.8em;font-weight:800;filter:drop-shadow(0 2px 3px rgba(0,0,0,.35));max-width:80%;margin:0 auto;overflow:hidden}
+.header .status{font-size:.85em;margin-top:1px;color:rgba(0,0,0,.7)}
+
+.main{padding:4px 12px;flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px}
+.section-title{font-size:.9em;font-weight:700;margin:4px 0 3px;padding-left:4px}
+.grid{display:flex;flex-wrap:wrap;justify-content:space-evenly;row-gap:var(--grid-gap,4px);margin-bottom:4px}
+
+.card{background:var(--card);border-radius:12px;border:2px solid var(--orange);text-align:center;cursor:pointer;transition:transform .15s;user-select:none;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;width:var(--card-size,80px);height:var(--card-size,80px);box-sizing:border-box;overflow:hidden}
+.card.optional{border-color:var(--green)}.card.done{background:var(--done-bg);border-color:var(--green)}.card.locked{background:var(--locked-bg);border-color:#ccc;opacity:.7}.card.mandatory-bg{background:var(--mandatory-bg)}
+@keyframes card-pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,155,53,.6)}50%{box-shadow:0 0 0 6px rgba(255,155,53,0)}}
+.card.pending{animation:card-pulse 1.15s ease-in-out infinite}
+.card .syncing{position:absolute;top:2px;left:3px;font-size:.6em;opacity:.85}
+.card .emoji{line-height:1.1}.card .label{font-weight:600;line-height:1.1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;padding:0 2px}.card .pts{color:var(--muted);display:flex;justify-content:center}
+.star-row{display:inline-flex;justify-content:center}.star-row span{display:inline-block;filter:drop-shadow(0 1px 2px rgba(0,0,0,.3))}
+.card .check{position:absolute;top:2px;right:4px;font-size:.8em}.card .lock{position:absolute;top:2px;right:4px;font-size:.7em}
+.card.bounce{animation:bounce .3s}
+@keyframes bounce{0%{transform:scale(1)}30%{transform:scale(.9)}60%{transform:scale(1.08)}100%{transform:scale(1)}}
+
+.bottom-bar{padding:10px 16px calc(10px + env(safe-area-inset-bottom));text-align:center;background:var(--bg);flex-shrink:0}
+.money-btn{background:linear-gradient(135deg,var(--orange),var(--yellow));color:var(--dark);border:none;border-radius:30px;padding:10px 40px;font-size:1.05em;font-weight:700;cursor:pointer;width:90%;max-width:400px;box-shadow:0 3px 8px rgba(0,0,0,.15)}
+.money-btn:active{transform:scale(.95)}
+
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.85);color:#fff;padding:10px 20px;border-radius:20px;font-size:.9em;z-index:999;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap}
+.toast.show{opacity:1}
+
+.confetti-piece{position:fixed;width:8px;height:8px;border-radius:50%;z-index:998;pointer-events:none;animation:confetti-fall 1.2s ease-out forwards}
+@keyframes confetti-fall{0%{opacity:1;transform:translateY(0) rotate(0deg) scale(1)}100%{opacity:0;transform:translateY(300px) rotate(720deg) scale(0)}}
+
+.overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:100;display:none;justify-content:center;align-items:center}
+.overlay.active{display:flex}
+.modal{background:#fff;border-radius:18px;width:92%;max-width:500px;max-height:88vh;overflow-y:auto;padding:20px;position:relative}
+.modal h2{text-align:center;margin-bottom:12px;font-size:1.2em}
+.modal-close{position:absolute;top:10px;right:14px;font-size:1.4em;background:none;border:none;cursor:pointer;color:var(--dark)}
+.modal label{display:block;font-weight:600;margin:8px 0 4px;font-size:.9em}
+.modal input[type="text"],.modal input[type="number"],.modal input[type="password"]{width:100%;padding:10px;border:2px solid #ddd;border-radius:10px;font-size:1em}
+.modal .btn{display:block;width:100%;padding:12px;border:none;border-radius:12px;font-size:1em;font-weight:700;cursor:pointer;margin-top:10px;color:#fff}
+.btn-orange{background:var(--orange)}.btn-green{background:var(--green)}.btn-red{background:#E53935}.btn-blue{background:#4285F4}
+
+.emoji-picker{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+.emoji-picker span{font-size:1.6em;cursor:pointer;padding:4px;border-radius:8px;border:2px solid transparent}
+.emoji-picker span.selected{border-color:var(--orange);background:var(--mandatory-bg)}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:6px 0}
+.toggle{width:48px;height:26px;border-radius:13px;background:#ccc;position:relative;cursor:pointer;transition:background .2s}
+.toggle.on{background:var(--green)}
+.toggle::after{content:'';position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:left .2s}
+.toggle.on::after{left:25px}
+
+.stat-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee;font-size:.9em}
+.stat-row:last-child{border:none}.stat-label{color:var(--muted)}.stat-value{font-weight:700}
+.history-item{padding:10px;border-bottom:1px solid #eee;cursor:pointer;display:flex;justify-content:space-between;align-items:center}
+.history-item:active{background:#f5f5f5}.history-date{font-weight:600}.history-pts{color:var(--orange);font-weight:700}
+.withdrawal-item{padding:8px 0;border-bottom:1px solid #eee;font-size:.85em}
+.task-item{display:flex;align-items:center;gap:8px;padding:6px 0;font-size:.9em}
+.chart-container{margin:12px 0}
+.chart-bar-row{display:flex;align-items:center;gap:6px;margin:3px 0;font-size:.75em}
+.chart-bar{height:16px;background:linear-gradient(90deg,var(--orange),var(--yellow));border-radius:8px;min-width:2px;transition:width .3s}
+.chart-date{width:50px;text-align:right;color:var(--muted);flex-shrink:0}.chart-val{width:24px;font-weight:700;flex-shrink:0}
+
+.backup-section{margin:16px 0;padding:14px;background:#f8f9fa;border-radius:12px}
+.backup-section h3{font-size:1em;margin-bottom:8px}
+.backup-info{font-size:.8em;color:var(--muted);margin-top:6px}
+.btn-outline{background:#fff;color:var(--dark);border:2px solid #ddd;display:block;width:100%;padding:10px;border-radius:12px;font-size:.9em;font-weight:600;cursor:pointer;margin-top:8px;text-align:center}
+.btn-outline:active{background:#f5f5f5}
+.setup-note{font-size:.8em;color:var(--muted);margin:8px 0;line-height:1.4}
+.badge-v2{display:inline-block;background:rgba(0,0,0,.12);color:#fff;font-size:.6em;padding:2px 8px;border-radius:6px;vertical-align:middle;margin-left:6px;letter-spacing:1px}
+@keyframes fadeIn{0%{opacity:0}100%{opacity:1}}
+.fade-in{animation:fadeIn .4s ease-in forwards}
+@keyframes fadeOutDown{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(30px)}}
+.fade-out-down{animation:fadeOutDown .34s ease forwards}
+@keyframes fadeInUp{from{opacity:0;transform:translateY(26px)}to{opacity:1;transform:translateY(0)}}
+.fade-in-up{animation:fadeInUp .42s cubic-bezier(.2,.7,.2,1) forwards}
+.progress-wrap{width:280px;max-width:80vw;margin:14px auto 4px}
+.progress-track{height:8px;border-radius:99px;background:rgba(255,255,255,.28);overflow:hidden}
+.progress-fill{height:100%;width:0;background:#fff;border-radius:99px;box-shadow:0 0 10px rgba(255,255,255,.6);transition:width .6s cubic-bezier(.4,0,.2,1)}
+.progress-pct{color:rgba(255,255,255,.9);font-size:.72em;margin-top:7px;text-align:center;font-weight:700;letter-spacing:.5px}
+.fund-addr-box{background:#fff;border-radius:14px;padding:12px 14px;margin:12px auto 14px;max-width:340px;box-shadow:0 4px 14px rgba(0,0,0,.18)}
+.fund-addr-label{color:var(--dark);font-size:.82em;font-weight:800;margin-bottom:8px}
+.fund-addr-row{display:flex;align-items:center;gap:8px}
+.fund-addr{flex:1;font-family:ui-monospace,Menlo,monospace;font-size:.74em;color:var(--dark);word-break:break-all;text-align:left;background:var(--mandatory-bg);padding:8px 10px;border-radius:8px;user-select:all;border:1px dashed var(--orange)}
+.fund-copy{flex-shrink:0;background:var(--orange);color:#fff;border:none;border-radius:8px;padding:10px 12px;font-weight:700;font-size:.82em;cursor:pointer}
+.fund-copy:active{opacity:.7}
+.tok-etny{display:inline-block;width:1.15em;height:1.15em;vertical-align:-0.22em;background:url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAPbUlEQVR42u2aeYxdV33HP79z77vvvVk9XmLP2E7sLCSxZWelbQI0UZrGQMMSpDFVC4UIKVGlqqhQSqSgvhk1REpRpBahtkRVkVqpUjMUQkiUFAJxZCgQSMDBY5yFxEviJZ593rzt3nO+/eO9Gc/Y4y0sKWK+o5FGo3vvOb/f97efA0tYwhKWsIQlLGEJS1jCbyXszd+C5u3B9FukABkCBk7YwwBq/ufXowx7U4QGsDMIqJZl2K9WEfZrFf5BHOM4DmEcRvTiGbSw4LGSHIeJ6D3NM/8/FDCPTU4w5QF08iqnYLKkGHBsxrPd/Dmt+0twnzemAMkYwjGM0YdxCGMM42LgJWA5og9xaJ4iNqMTBVxVUkcd1viEQhao5hxT5QJl+6RVdaZ1wc2tCTC2YM1wtlZj5yz4L+KX96tYrLLcGSsU0RuJtQr0ySiaqMqYIGLcpYxlOY7lGoxbxuhkHzPcSXZugbFlKWewiLNXQEkOaP7uwTN0NuY6j+0vqKM8xeYY3ia4CnGJHD0GbYgICDLqBhUCMzIOmfGseZ6IY3423kOFQ+cQD76oHMCZ3nnDMWD1J9U+vZpO7ykkIpGIFWEGwQVSM7IsULU8Pk3pygW2Ks/1lnEzgSutHZMHMiClqcw8kRWauwqTVAweQjxQvtueWrDuWrrijLaQklfUlMEZWSqqSZXy1B4mFxBUkmMQLWYJ8Vkyz3wtbiopOZBwpfNsNuiTsQKj20QsUQ8w7sSowRHXoJbzXIDj982xyWLWy0AzZIKDGK9bYEKGp8EGUjZZAgbHJA4B47PrdpW0fCbhcldjizcuMlhlkCBCgKk48FrIsbd7K89ODvHKnAzLydFPxhD+7C1AsgW+fr+KbVN0W8QqIi43xzskrgQuMDjPEvI4UAp4poCjGPvNMyHHBou41jogVJhQyl5gt8E+AqMuY9o7Uue4IDguMyOH52fy/MgZB1yO1AfWE7FJ4kqa617qYrqJgQBKaSiwz+AZM54Oxk/ijP2T5/Eqd1q6qEyntoBWtKWlsZLidrjYEt4exNudcTmw1mAlBZzlwGa/lAdSukjpUoN1MiZxdFOAME0NeEzwmMXsygITLqahGWQr8GmVdmcsM6NByrFQIXEdXBHE9RjXy9hgcB5Gh7W11jRAQEZClbfI0yPjShcYDY6dHSP8exn2ttJkBPLzXeFsXCDpynO+r/MHJPyREzdZEacK4DmqKpPUKAfRaBX2iaDNoBNYbXnWSBAq7Mezw+CruXaemvwrm1hktRFg/6y5WzfXKOIWAu+kwMXmQA0myHieMhWJbJ4l5zHOs4jV1sUqMtA0qxATK+6TRiu8wqA1jseEpkvHJzFfwhi0wLC0qaTkYBsXhIwbEbeR4ypLcJQBz48ROw12B8eBKDBBwDx0E9FL4EKMmyzjbSZGgviyHEPJFC9MfmZR4eew4j711TM+ivEeIs5HrKGGiHhOsCMSP0EcDaJO0wBii1hh4noCt1nGWgXAsVGB2xsZyzojvjQNL7aWcCCBKT4pJvQRIQmzcPBedQZxlXO8G+OtFlFUnVFSdgH/A3w3cuwp32XjC77yBXW0H2MDBY5KvNpSwFdrd9sPqscVnWul1TDLzIr71OkrbKwH3kvEx6yTDaSgjFeB71ngOxjfnc6zl0/ZzII1v6RCxyFeRVQ1zXWCC4npcwUu0wzbcDyzqqTDx6DC5laBVpJzCz7SjzFFwudJKMmFjD4n3iHjBmujqAoNGjyNGMp5Ho3aGJ6sMX0ShX9h5Rl4QZ6vKHAP8PnaSn68oO0dIOMwnr7WZiRXgUuzhA8R+DCOC1QDKowgvinHA1nElys1hvmbE4QHuN1q7QnPRsa/ZMbfAzvkKSNArJHjd2p5Nq/uoEg/oRUHXLww8JlniLmPR/eoT2KL5emRp0LKDxT4zyTh6+N32eSimWOgWdQwaI0KHKb5O7/uBwgMAA+0ovP9KnbexxUh4lZiPmAJFynFU2MvgZ0W8Wj5Ip6cK6UfVALA8FyZDYexox+3GeBlHtT+9pcpEugOtfAOc67PxLsE45M1DmEtBS4nihf6/vHafcWn1FmHi4A+M6DBqOB7ocaT43+7iPDHS+TslM49aBmSYwjjiZb5A8WULSHwUWK2WcyGVir9OeJxIv47duxZ0EdstwaS0X+KhL7dvLtX3wLyCm655bmOlC0KbI0cjwAHW/2DxcerpCYTXZ6+tMGqmtiIcY1Bt1IypWRmJFE7F7d/Vj0SsWISczQsJYtyVP0M0zMwwQApA614UsMxhtiMb5oeYrsFwHO/il1VtviI2wzeZ0XWUKOmjN0W2CHxWLnODxi0QL8iNpEDMgbxJ/cjMh5UxEES1tOY3m6jPX+nHamjVyllC+TN8ZITtXkvhZjl5MDqDIque1kruD1yXIdok9ENdONxGN0YNwouNKNuAadAHhHMqCjjgOX4UUfKzrLZCAhKiAHSVqZu1hZN5tNZ5r1xO453WY41mgECuw0ejuDRJOOFmdkKdIhAiQYDiMHFmhsT2xUoUW8pmPGMw4WY/0oynhTEGGPFIoenjr+UGV9UG3daBaB4r343gn9yy7maFMI0wjA8UkRqIrG4JU6Yl0RTUonnEF/NUv6jNmgHALhDOXrxc/OBWdZmmc9zmwU+Yh30UqcaquyywGPeeLz6GXu65e8Rh4n5OCmcZSMkGXcSz8WY0yA+Q6N83LPU+gFbtIB2LcXMR3OqEzGAOIydgvlezQBit8GjcjxcLczla9hOoHQOws8OSsaHz6rRi6nNNgiyHIwKHg9jTAgKBl2Ii4jJ46ljDOPZp6YfOWUUgGCOisEBwZ4YKvMyQuABy06YB2xxEbeZ8T4rNJlX2mI+xzeqVXZztwUeVMROYpaTMoha37NTdXVzcaAfx6B5oEH/WHd3o3FtcCvXks5ELm28IlWfm/rG+WPNtK8oZqzJCiVsKs9rXZ5/846v4OmV5yYTy1zMamXU5fi+YoaswetBJHLkLaFBRuYC1ZBjagamKMkxgDtxe8WULa7J/DsXZT7Hi9zVYnqW+T0YdxDxly86jlwiSgRQWKgIGWD0Y7SRm+1hinV/iU/1MRWiK8gs9j48GqlwCGgqYJo4XjAs+KRVp+Dns8bffq+WEXiXJawzT46MLMo4MHm3vXwW1hVmtdyxiR5zXBKM91rE+63IGqrUlPKTOeY/zW7MAiU5xsg1mZ/bmz/9mYIBEkOt7IKs8L6xdZam24LFN7uYVYraIKv8NKTKz71exY6zNHiCBzcz+hFnjCCwHG0S1/qMbcWS1p2meVoQV5ZtZZ2L+UNF3Inxx5ZvRnulDLeYf6ia46dYS9hBCxwhAxz9ik67Tj85+slxR+vvFlZuO7bGpeGDYNux3LIwM4nSsVdEeCFTrTz3jWOEeEEaKcnRR4Eanl4yXuSIHE9T4WKKrLEc10nIjK6ue/RkBgeLOcqjBRp83OpzxQ7QW1JbuY21WcaN5LiVwDbXTl5VKmrwnInHLc83yxcwzHbzLcXFzTw/L270HygWVq5cGaVRV+rqPkkZLX+pc2TBM7O49bW2AsWVdYUbIbzfovatUo5QH3nVSY+4YE8mTuN1ZGBiFWGhnw4iDtFgjJTt5tsa7MPxUICHVGfKujBLuMKM24Lxwdi4oWZs7HR03FBSjAH/qHz7P2h1uchWAu/F+BOLucn1kKcGytgl8VAIPJwr87OW8I7DGPuA8pH8/OOyYk/XZpeFD8myuyNFn5DZLcv/tLL2RNnX9atYzEVbY5f9mY/CR3B2OS6PmcPhjriInbFv/HCSfWX6cSDjKYIt7lemuenJ59TelnKDBf7cdfFWxGrVgZRDwDMydsmxzzzTFhEkCs6xKgTeYuL3gCusiGS8ogq75HkkFHmi9td28HQBpOMTWmnVqbdkIb7FYe8Bd7WytGLi26R8K4T0ZYdNkWIyV7DACvnwVvP+3USFi+U9eE2Q1Y6Y+FqUNP516uvnvwTADYp5Cr9YO9waIbdSDohP2Yz7rH4o0akaxwy2WUwfEX2q0WPiKsSUGb5VMUbydJixzCI65MlCyrMW8XXn+PZ0O8/Mucsp0HPHWHcjNLbJxbcYXIvsQsvlwXJtqlVuwHSpwyqIhiKQFEnKY1ptcXGlRW2oMeKR/djMfw25J6Z61++fW+CpuW7wDBOh1jlA2exY+2e1w2aokqOmjKswegXLLWGdS1qB2IM1+3cJJuTZY8ZPqfPdesaTxS4OFV6vnheV6t0pSeYyZuKp6VrU3pmlGfkkTz6daXTU5a+xED4gdLPLt7er3iDUK69blqVgqyzpvMTc8Yq0GQ1S1Ch7VH9NWfV14CVT+E6cuIcnv9a7by5wDuLnF1V2+mPrhQVH511aQQeXmGNjcFyIZ4uMq4G1rRemCByTsV/GCxHs8hHDlvHazDRZeydXWxreqaDzJR2Wt70u+FGTa5hZl2VhQ8j8pRKXKWijRcVlBqg6c0gh7FSmKRe4HLgMqQtvCQHwvobXUcEL5vUscs8p88+rzuHq21YeOZ5OT5bpzOXiSWNx2Yr76GhAH55L5dgSxBoCwWDSiRHBwQCvVNayl9utBtB2j650Ch8l6MOWRMt9xZcJDJvCKIHUPN2IiyC3nhyoGlCjdsykn0t8L2T6fvA2nSjbiNgoqY1MSZNPq+L9iEwvKzT2dJbd80e/2Xt8aNK/O2HT5myxA5I3fjhaUty9jI56na5coECGXI604WjkKtSmytS5vzl46C2pbSrhVhdCvwI3u7xbJoGqQJZ6vCRFscVRc0cNUK32mgV2yOuRzNmPkunG+LTvCm02U4ijrE2ySFnDNYVIfFT3jSyqVcqv16d5amPtTNZ87grQ3KgchtFZHVE1rSduT+gxcb0pXKHgzjeFXgWtJ2gZXjkCXj40JKsQNGY+HAN7yYj/N5+Pnxj9nE2fIzmOPcMxL9fErdf8Mo/GTq3J0yru8yRt0yyPHe0+I29iWUgbl7pg6yXLm1ddChNgI/JuJG7E4zVXHy+m+ZHJfz5h4HrOV29Ov197Qx8+frXFzR2Pz6J5qUGtuZ9OeZL8aXV3GqtDSuJS6qGnPHlZX8f4M3ee0MOXSo49/TGbNgf2IHqecYwXrDkInJ87Ec8jzhsSQ/3hbIn6xS5IsMgM4EwXIha7HNEcomanP6Y7oU8ZGJh3IWNACyX5VV+QeCPK6sfRg6MXg2EY2JyeZB3NuZ+xZ9jRs7lpSQOLzf9+IyFDsmZglJ3Vs2d87jf5mpzmyu037Yrcm6uABZH61yv0EpawhCUsYQlLWMISlrAE/g/nMSdEKIh2bAAAAABJRU5ErkJggg==') center/contain no-repeat;margin:0 3px}
+.tok-bergs{display:inline-block;width:1.15em;height:1.15em;vertical-align:-0.22em;background:url('data:image/png;base64,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') center/contain no-repeat;margin:0 3px}
+</style>
+</head>
+<body>
+
+<!-- LOADING SCREEN -->
+<div class="fullscreen" id="screenLoading">
+  <h1>&#11088;</h1>
+  <h2>Star Chart <span class="badge-v2">web3</span></h2>
+  <div class="spinner" id="loadingSpinner"></div>
+  <div class="setup-status" id="loadingStatus">Starting up…</div>
+  <div class="progress-wrap" id="loadingProgressWrap" style="display:none">
+    <div class="progress-track"><div class="progress-fill" id="loadingBar"></div></div>
+    <div class="progress-pct" id="loadingPct">0%</div>
+  </div>
+</div>
+
+<!-- FUNDING GATE SCREEN -->
+<div class="fullscreen hidden" id="screenFund">
+  <h1>&#11088;</h1>
+  <h2>Add testnet tokens</h2>
+  <p style="max-width:320px">Your wallet needs a little gas and some tokens to save chores to the secure enclave.</p>
+  <div class="fund-addr-box">
+    <div class="fund-addr-label">&#128073; Send gas &amp; tokens to THIS wallet</div>
+    <div class="fund-addr-row">
+      <span class="fund-addr" id="fundAddr">…</span>
+      <button class="fund-copy" id="fundCopyBtn" onclick="copyFundAddr()">&#128203; Copy</button>
+    </div>
+  </div>
+  <div class="setup-status" id="fundGas">Checking gas…</div>
+  <div class="setup-status" id="fundBalance">Checking balance…</div>
+  <div class="setup-status" id="fundHint" style="color:#fff;font-weight:600"></div>
+  <button class="setup-btn" id="fundGasBtn" onclick="openGasFaucet()" style="display:none"><span class="tok-bergs"></span> Get gas (opens faucet)</button>
+  <button class="setup-btn" id="fundFaucetBtn" onclick="fundFaucetDrip()"><span class="tok-etny"></span> Get 1000 tETNY (faucet)</button>
+  <button class="setup-btn" onclick="fundRecheck()" style="background:rgba(0,0,0,.15)">Recheck</button>
+  <div class="setup-status" id="fundStatus"></div>
+</div>
+
+<!-- FAMILY CREATED SCREEN -->
+<div class="fullscreen hidden" id="screenFamilyCreated">
+  <h1>&#127881;</h1>
+  <h2>Family created!</h2>
+  <p style="max-width:340px"><strong>Save your Family ID.</strong> You'll need it to get back into your Star Chart and to invite members. Copy it and keep it somewhere safe.</p>
+  <div class="fund-addr-box">
+    <div class="fund-addr-label">&#128273; Your Family ID &mdash; write this down</div>
+    <div class="fund-addr-row">
+      <span class="fund-addr" id="createdFamilyId">…</span>
+      <button class="fund-copy" id="famIdCopyBtn" onclick="copyFamilyId()">&#128203; Copy</button>
+    </div>
+  </div>
+  <button class="setup-btn" onclick="enterAppFromCreated()">Open Star Chart &#11088;</button>
+</div>
+
+<!-- LOGIN SCREEN -->
+<div class="fullscreen hidden" id="screenLogin">
+  <h1>&#11088;</h1>
+  <h2>Star Chart <span class="badge-v2">web3</span></h2>
+  <p>Sign in with Google, email, or connect your wallet. Your data lives on-chain, owned by you.</p>
+  <button class="setup-btn google" id="web3authBtn" onclick="doLoginWeb3Auth()" style="display:flex;align-items:center;justify-content:center;gap:8px">
+    <svg viewBox="0 0 24 24" style="width:20px;height:20px"><path fill="#fff" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#fff" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#fff" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#fff" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+    Sign In
+  </button>
+  <button class="setup-btn" id="connectBtn" onclick="doLoginWallet()" style="background:#E2761B;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:4px">
+    <svg viewBox="0 0 318.6 318.6" style="width:20px;height:20px"><path fill="#fff" d="M274.1 35.5l-99.5 73.9L193 65.8z"/><path fill="#fff" d="M44.4 35.5l98.7 74.6-17.5-44.3zm190.9 169.3l-26.5 40.6 56.7 15.6 16.3-55.3zm-213.1.9l16.2 55.3 56.7-15.6-26.5-40.6z"/></svg>
+    Connect MetaMask
+  </button>
+  <div class="setup-error" id="loginError"></div>
+  <div class="setup-status" id="loginStatus"></div>
+</div>
+
+<!-- FAMILY SETUP SCREEN -->
+<div class="fullscreen hidden" id="screenFamily">
+  <h1>&#128106;</h1>
+  <h2>Family Setup</h2>
+  <div class="wallet-badge" id="walletDisplay"></div>
+  <p style="margin-top:16px">Create a new Star Chart or join an existing family.</p>
+  <button class="setup-btn" onclick="createFamily()" style="background:rgba(0,0,0,.25)">Create New Star Chart</button>
+  <p style="margin-top:20px">Or enter a family ID to join:</p>
+  <input type="text" id="joinFamilyId" placeholder="FAMILY ID" maxlength="42" style="width:280px;padding:12px;border:none;border-radius:10px;font-size:1em;text-align:center;letter-spacing:1px;margin-top:4px;font-family:monospace">
+  <button class="setup-btn" onclick="joinFamily()" style="margin-top:6px;background:rgba(0,0,0,.25)">Join Family</button>
+  <div class="setup-error" id="familyError"></div>
+  <a href="#" onclick="doLogout();return false;" style="display:inline-block;margin-top:24px;color:rgba(255,255,255,.7);font-size:.85em;text-decoration:underline">Sign out</a>
+</div>
+
+<!-- APP -->
+<div id="appContainer" style="display:none;height:100%;flex-direction:column">
+<div class="topbar">
+  <div class="topbar-title">&#11088; Star Chart <span class="badge-v2" style="background:rgba(255,255,255,.2)">v2</span></div>
+  <div class="topbar-actions">
+    <button onclick="openAddTask()" title="Add Task">+</button>
+    <button onclick="openSync()" title="Info"><span class="sync-dot green" id="syncDot"></span><span id="syncCount" style="font-size:.72em;color:#fff;margin-right:1px;font-weight:700"></span>&#9729;&#65039;</button>
+    <button onclick="openReport()" title="Report">&#128202;</button>
+    <button onclick="openHistory()" title="History">&#128336;</button>
+    <button onclick="openAdmin()" title="Admin">&#128272;</button>
+    <button onclick="toggleDebug()" title="Debug" style="font-size:1.1em">&#128027;</button>
+  </div>
+</div>
+<div class="header">
+  <div class="stars" id="starCount">&#11088; 0</div>
+  <div class="status" id="statusMsg">Finish chores first!</div>
+</div>
+<div class="main" id="mainContent"></div>
+<div class="bottom-bar">
+  <button class="money-btn" onclick="openMoney()">&#128176; Get Money</button>
+</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- DEBUG LOG PANEL -->
+<div id="debugPanel" style="display:none;position:fixed;bottom:0;left:0;right:0;height:35vh;background:rgba(0,0,0,.92);color:#0f0;font-family:monospace;font-size:11px;z-index:400;flex-direction:column">
+  <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px;background:rgba(255,255,255,.1);flex-shrink:0">
+    <span style="font-weight:700;color:#fff">Debug Log</span>
+    <div>
+      <button onclick="document.getElementById('debugLog').textContent=''" style="background:none;border:1px solid #666;color:#aaa;border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer;margin-right:4px">Clear</button>
+      <button onclick="document.getElementById('debugPanel').style.display='none'" style="background:none;border:1px solid #666;color:#aaa;border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer">&times;</button>
+    </div>
+  </div>
+  <pre id="debugLog" style="flex:1;overflow-y:auto;padding:4px 8px;margin:0;white-space:pre-wrap;word-break:break-all;-webkit-overflow-scrolling:touch"></pre>
+</div>
+
+<!-- MODALS -->
+<div class="overlay" id="addTaskOverlay"><div class="modal"><button class="modal-close" onclick="closeOverlay('addTaskOverlay')">&times;</button><h2>Add Task</h2><label>Task Name</label><input type="text" id="newTaskName" placeholder="e.g. Feed the dog"><label>Emoji</label><div class="emoji-picker" id="emojiPicker"></div><label>Points (0 = mandatory)</label><input type="number" id="newTaskPoints" value="2" min="0" max="10"><div class="toggle-row"><span>Mandatory (Must Do)</span><div class="toggle" id="newTaskMandatory" onclick="toggleMandatory()"></div></div><button class="btn btn-orange" onclick="addTask()">Add Task</button></div></div>
+<div class="overlay" id="reportOverlay"><div class="modal"><button class="modal-close" onclick="closeOverlay('reportOverlay')">&times;</button><h2>&#128202; Today's Report</h2><div id="reportContent"></div></div></div>
+<div class="overlay" id="historyOverlay"><div class="modal"><button class="modal-close" onclick="closeOverlay('historyOverlay')">&times;</button><h2>&#128336; History</h2><div id="historyContent"></div></div></div>
+<div class="overlay" id="historyDetailOverlay"><div class="modal"><button class="modal-close" onclick="closeOverlay('historyDetailOverlay')">&times;</button><h2 id="historyDetailTitle">Day Detail</h2><div id="historyDetailContent"></div></div></div>
+<div class="overlay" id="moneyOverlay"><div class="modal"><button class="modal-close" onclick="closeOverlay('moneyOverlay')">&times;</button><h2>&#128176; Get Money</h2><div id="moneyContent"></div></div></div>
+<div class="overlay" id="adminOverlay"><div class="modal"><button class="modal-close" onclick="closeOverlay('adminOverlay')">&times;</button><h2>&#128272; Admin</h2><div id="adminContent"></div></div></div>
+<div class="overlay" id="syncOverlay"><div class="modal"><button class="modal-close" onclick="closeOverlay('syncOverlay')">&times;</button><h2>&#9729;&#65039; Wallet &amp; State</h2><div id="syncContent"></div></div></div>
+<div class="overlay" id="errorOverlay" style="z-index:300"><div class="modal" style="text-align:center"><button class="modal-close" onclick="closeOverlay('errorOverlay')">&times;</button><div style="font-size:2.5em;margin:10px 0" id="errorIcon">&#9888;&#65039;</div><h2 id="errorTitle" style="color:#E53935">Something went wrong</h2><p id="errorMessage" style="margin:12px 0;font-size:.9em;color:var(--muted);word-break:break-word;max-height:40vh;overflow-y:auto"></p><button class="btn btn-red" onclick="closeOverlay('errorOverlay')" style="margin-top:8px">OK</button></div></div>
+
+<script src="dist/auth.bundle.js"></script>
+<script src="dist/ethernity.bundle.js"></script>
+
+<script>
+/* ===== DEBUG LOG INTERCEPTOR ===== */
+(function() {
+  var panel = document.getElementById('debugPanel');
+  var log = document.getElementById('debugLog');
+  var origLog = console.log, origWarn = console.warn, origErr = console.error;
+  function ts() { var d = new Date(); return d.toLocaleTimeString('en',{hour12:false}) + '.' + String(d.getMilliseconds()).padStart(3,'0'); }
+  function appendLine(prefix, color, args) {
+    var msg = Array.from(args).map(function(a) { try { return typeof a === 'object' ? JSON.stringify(a) : String(a); } catch(e) { return String(a); } }).join(' ');
+    var line = document.createElement('div');
+    line.style.color = color;
+    line.style.borderBottom = '1px solid rgba(255,255,255,.05)';
+    line.style.padding = '1px 0';
+    line.textContent = '[' + ts() + '] ' + prefix + ' ' + msg;
+    log.appendChild(line);
+    log.scrollTop = log.scrollHeight;
+  }
+  console.log = function() { origLog.apply(console, arguments); appendLine('LOG', '#0f0', arguments); };
+  console.warn = function() { origWarn.apply(console, arguments); appendLine('WRN', '#ff0', arguments); };
+  console.error = function() { origErr.apply(console, arguments); appendLine('ERR', '#f44', arguments); };
+  window.addEventListener('error', function(e) { appendLine('ERR', '#f44', [e.message + ' @ ' + (e.filename||'') + ':' + (e.lineno||'')]); });
+  window.addEventListener('unhandledrejection', function(e) { appendLine('REJ', '#f44', [e.reason && e.reason.message || String(e.reason)]); });
+  window.toggleDebug = function() {
+    panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
+  };
+})();
+
+/* ===================================================================
+   StarChart Web3 — Web3Auth wallet + Ethernity Cloud TEE (on-chain only)
+
+   The ONLY source of truth is the chain: state lives in the SGX enclave and
+   is committed to the ESR contract on Bloxberg via the node relay. There is no
+   Firebase and no local "enclave" backend — every read/write goes through the
+   enclave (@ethernity-cloud/runner), which has its own read cache.
+
+   - Web3Auth (social login → embedded Bloxberg wallet) for authentication
+   - EIP-191 intent signing for all state mutations
+   - Enclave (read_family / submitTask) = authoritative state, ESR = audit trail
+   - OptimisticCache (localStorage) is ONLY an optimistic render cache: it
+     predicts the next state so star-clicks highlight instantly, then the
+     enclave result overwrites it. It is never trusted for correctness.
+   =================================================================== */
+
+/* ===== WEB3AUTH CONFIG ===== */
+/* Get your client ID from https://dashboard.web3auth.io */
+var WEB3AUTH_CLIENT_ID = 'BLoMa8J5zkJ3xDG1PGpSeCq63rRw-huO-l4vmwwV0A7kKc5bBpiphLzrH3ShSyeP97KOS8MjgOIK3t4OVp0stMI';
+var BLOXBERG_RPC = 'https://core.bloxberg.org';
+
+/* ===== ESR CONTRACT CONFIG =====
+   Enumerable registry (SDK 0.8.12). Under the node-relay model the ENCLAVE signs
+   each commit and the NODE relays + pays gas, so the client NEVER writes to ESR.
+   Version/nonce are read via the runner (window.EthernityRunner). State contents
+   are enclave-private — actual data always comes from the enclave function return
+   (execute / read_family). ESR_ADDRESS is shown in the state panel for reference. */
+var ESR_ADDRESS = '0xda5e68Bb5e68ee14D73b8de2a4D3Ca15736fACfb';
+
+var ethersProvider = null;
+var userWallet = null;   /* { address, signer } */
+var userInfo = null;     /* { name, address } */
+var familyId = null;     /* hex family identifier */
+var familyState = null;  /* current family state object */
+var esrVersion = 0;      /* current on-chain version for this family's state (from the enclave/runner) */
+var esrNonce = 0;        /* last accepted ESR idempotency nonce (exactly-once writes) */
+
+/* ===== DEFAULT TASKS (same as enclave backend) ===== */
+var DEFAULT_TASKS = [
+  {id:'brush',name:'Brush teeth',emoji:'\uD83E\uDEA5',points:0,mandatory:true},
+  {id:'dress',name:'Get dressed',emoji:'\uD83D\uDC55',points:0,mandatory:true},
+  {id:'shoes',name:'Put shoes away',emoji:'\uD83D\uDC5F',points:0,mandatory:true},
+  {id:'toys',name:'Clean up toys',emoji:'\uD83E\uDDF8',points:2,mandatory:false},
+  {id:'table',name:'Set the table',emoji:'\uD83C\uDF7D\uFE0F',points:2,mandatory:false},
+  {id:'store',name:'Help at store',emoji:'\uD83D\uDED2',points:3,mandatory:false},
+  {id:'car',name:'Prep the car',emoji:'\uD83D\uDE97',points:2,mandatory:false},
+  {id:'laundry',name:'Fold laundry',emoji:'\uD83E\uDDFA',points:3,mandatory:false},
+  {id:'plants',name:'Water plants',emoji:'\uD83E\uDEB4',points:2,mandatory:false},
+  {id:'bed',name:'Make the bed',emoji:'\uD83D\uDECF\uFE0F',points:2,mandatory:false},
+  {id:'fix',name:'Fix stuff',emoji:'\uD83D\uDEE0\uFE0F',points:3,mandatory:false},
+  {id:'garden',name:'Gardening',emoji:'\uD83C\uDF37',points:3,mandatory:false}
+];
+
+var EMOJIS = ['\uD83C\uDF1F','\uD83E\uDDF9','\uD83D\uDED2','\uD83D\uDE97','\uD83E\uDDFA','\uD83C\uDF31','\uD83D\uDC36','\uD83D\uDECF\uFE0F','\uD83D\uDC5F','\uD83C\uDF7D\uFE0F','\uD83D\uDCDA','\uD83C\uDFC0','\uD83C\uDFA8','\uD83C\uDFB5','\uD83D\uDEB4','\uD83E\uDDFB'];
+var selectedEmoji = EMOJIS[0];
+
+/* ===== HELPERS ===== */
+function esc(s){if(!s)return '';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+function today(){return new Date().toISOString().slice(0,10);}
+function lsGet(k,d){try{var v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}}
+function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+
+/* ===== SCREENS ===== */
+function showScreen(id){document.querySelectorAll('.fullscreen').forEach(function(s){s.classList.add('hidden');});document.getElementById(id).classList.remove('hidden');}
+
+/* ===================================================================
+   OPTIMISTIC RENDER CACHE
+
+   NOT a backend. The enclave (chain) is the only source of truth. This mirrors
+   the enclave's action logic in-browser ONLY to predict the next state so a
+   star-click can highlight instantly; the queued enclave commit then returns the
+   authoritative state, which overwrites this cache. Persisted to localStorage
+   (keyed by familyId) so an optimistic change survives a reload until its commit
+   lands. Never trusted for correctness decisions.
+   =================================================================== */
+var OptimisticCache = {
+  _stateKey: function(fid) { return 'esr_state_' + fid; },
+
+  getState: function(fid) {
+    return lsGet(this._stateKey(fid), null);
+  },
+
+  setState: function(fid, state) {
+    lsSet(this._stateKey(fid), state);
+  },
+
+  execute: function(fid, action, intent, signerAddress) {
+    var state = this.getState(fid);
+
+    /* Nonce validation — every mutation must carry the expected nonce.
+       If intent.nonce is present and doesn't match state.nonce, the
+       update is stale and gets rejected. This prevents out-of-order
+       or duplicate updates from overwriting newer state. */
+    if (action !== 'create_family') {
+      if (!state) throw new Error('Family does not exist');
+      var currentNonce = state.nonce || 0;
+      if (typeof intent.nonce === 'number' && intent.nonce !== currentNonce) {
+        throw new Error('Nonce mismatch: expected ' + currentNonce + ', got ' + intent.nonce + '. State was updated by another client.');
+      }
+    }
+
+    switch(action) {
+      case 'create_family':
+        if (state !== null) throw new Error('Family already exists');
+        state = {
+          owner: signerAddress.toLowerCase(),
+          members: [signerAddress.toLowerCase()],
+          tasks: DEFAULT_TASKS.map(function(t){ return Object.assign({}, t); }),
+          days: {},
+          withdrawals: [],
+          nonce: 0,
+          created_at: Math.floor(Date.now() / 1000)
+        };
+        break;
+
+      case 'complete_chore':
+        this._validateMembership(state, signerAddress);
+        var taskIds = {};
+        state.tasks.forEach(function(t){ taskIds[t.id] = true; });
+        if (!taskIds[intent.chore_id]) throw new Error('Unknown chore: ' + intent.chore_id);
+        if (!state.days) state.days = {};
+        if (!state.days[intent.date]) state.days[intent.date] = {};
+        state.days[intent.date][intent.chore_id] = true;
+        break;
+
+      case 'uncomplete_chore':
+        this._validateMembership(state, signerAddress);
+        if (state.days && state.days[intent.date] && intent.chore_id in state.days[intent.date]) {
+          state.days[intent.date][intent.chore_id] = false;
+        }
+        break;
+
+      case 'add_task':
+        this._validateMembership(state, signerAddress);
+        var task = intent.task;
+        var existingIds = {};
+        state.tasks.forEach(function(t){ existingIds[t.id] = true; });
+        if (existingIds[task.id]) throw new Error('Task ID already exists: ' + task.id);
+        state.tasks.push(task);
+        break;
+
+      case 'remove_task':
+        this._validateMembership(state, signerAddress);
+        state.tasks = state.tasks.filter(function(t){ return t.id !== intent.task_id; });
+        break;
+
+      case 'withdraw':
+        this._validateMembership(state, signerAddress);
+        if (!state.withdrawals) state.withdrawals = [];
+        state.withdrawals.push({
+          points: intent.points,
+          euros: intent.euros,
+          date: intent.date,
+          timestamp: Math.floor(Date.now() / 1000),
+          by: signerAddress.toLowerCase()
+        });
+        break;
+
+      case 'invite_member':
+        this._validateOwner(state, signerAddress);
+        var wallet = intent.wallet.toLowerCase();
+        var members = state.members.map(function(m){ return m.toLowerCase(); });
+        if (members.indexOf(wallet) !== -1) throw new Error('Already a member');
+        state.members.push(wallet);
+        break;
+
+      case 'remove_member':
+        this._validateOwner(state, signerAddress);
+        var target = intent.wallet.toLowerCase();
+        if (target === signerAddress.toLowerCase()) throw new Error('Cannot remove yourself');
+        state.members = state.members.filter(function(m){ return m.toLowerCase() !== target; });
+        break;
+
+      default:
+        throw new Error('Unknown action: ' + action);
+    }
+
+    /* Increment nonce after every successful mutation */
+    if (!state.nonce) state.nonce = 0;
+    state.nonce++;
+    state.updated_at = Math.floor(Date.now() / 1000);
+
+    this.setState(fid, state);
+    return state;
+  },
+
+  _validateMembership: function(state, signer) {
+    if (!state) throw new Error('Family does not exist');
+    var members = (state.members || []).map(function(m){ return m.toLowerCase(); });
+    if (members.indexOf(signer.toLowerCase()) === -1) {
+      throw new Error('Not a family member');
+    }
+  },
+
+  _validateOwner: function(state, signer) {
+    if (!state) throw new Error('Family does not exist');
+    if (signer.toLowerCase() !== (state.owner || '').toLowerCase()) {
+      throw new Error('Not the family owner');
+    }
+  }
+};
+
+/* ===================================================================
+   ESR (Enclave State Registry) — ON-CHAIN STATE
+
+   The ESR contract on Bloxberg stores a state hash (CID) per family.
+   After each local mutation, we commit a keccak256 hash of the state
+   to the ESR contract. This creates an on-chain audit trail.
+
+   Key = keccak256(familyId)  →  maps to a slot in ESR
+   CID = keccak256(JSON.stringify(state))  →  state fingerprint
+
+   When the Ethernity Cloud enclave is deployed, the enclave will
+   replace the user's wallet as the committer, and CID will be a
+   real IPFS hash instead of a state fingerprint.
+   =================================================================== */
+
+function stateHash(state) {
+  var json = JSON.stringify(state, Object.keys(state).sort());
+  return ethers.keccak256(ethers.toUtf8Bytes(json));
+}
+
+/* ===================================================================
+   INTENT SIGNING (EIP-191)
+   Signs a JSON intent with the user's embedded wallet.
+   Same format the real enclave expects.
+   =================================================================== */
+async function signIntent(action, intentData) {
+  var intent = Object.assign({action: action}, intentData);
+  var message = JSON.stringify(intent, Object.keys(intent).sort());
+  var signature = await userWallet.signer.signMessage(message);
+  intent.signature = signature;
+  return intent;
+}
+
+/* ===================================================================
+   BACKGROUND-SAFE WRITES  (mobile / webview resilience)
+   A submitted task completes on the NETWORK even if this page is
+   backgrounded or closed: once the DO-request tx is on-chain, the node
+   executes it and node-relays the state commit — no client needed. Mobile
+   suspends JS, so we don't rely on staying alive; instead we persist an
+   in-flight marker and RECONCILE on resume via a FREE on-chain version
+   check. The exactly-once esr_nonce makes any accidental re-submit a no-op
+   (task code 36), so reconciliation is always safe.
+   =================================================================== */
+/* ===================================================================
+   SCREEN TRANSITIONS + STEP PROGRESS BAR
+   Drives the loading screen's progress bar from the runner's own step
+   messages (create + login-read). The bar only moves forward, and gently
+   "creeps" toward the next milestone during long waits so it feels alive.
+   =================================================================== */
+function sleep(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
+function revealScreen(id){
+  showScreen(id);
+  var el = document.getElementById(id);
+  if (el){ el.classList.add('fade-in-up'); setTimeout(function(){ el.classList.remove('fade-in-up'); }, 460); }
+}
+function fadeOutScreen(id){
+  return new Promise(function(res){
+    var el = document.getElementById(id);
+    if (!el || el.classList.contains('hidden')){ res(); return; }
+    el.classList.add('fade-out-down');
+    setTimeout(function(){ el.classList.add('hidden'); el.classList.remove('fade-out-down'); res(); }, 340);
+  });
+}
+var PROGRESS_STEPS = [
+  { pct: 10, re: /checking wallet|verifying node|checking image registry/i,  label: 'Preparing your secure request…' },
+  { pct: 20, re: /uploaded .*ipfs|challenge|encrypted code/i,                label: 'Encrypting your data…' },
+  { pct: 30, re: /submitting transaction|do request|is pending/i,           label: 'Sending to the secure enclave…' },
+  { pct: 40, re: /created successfully|request \d+ was created|confirmed!/i, label: 'Confirmed on-chain…' },
+  { pct: 46, re: /waiting for ethernity|orders count/i,                     label: 'Finding a secure node…' },
+  { pct: 50, re: /operator .*processing|found order|connected!/i,           label: 'Secure node assigned…' },
+  // The enclave-execution step is the long wait — it spans the whole upper half
+  // (50% -> ~98%), creeping while the task runs so the bar visibly moves.
+  { pct: 50, re: /still processing|is processing task/i,                    label: 'Unlocking your vault…', cap: 98 },
+];
+var _progressPct = 0, _progressCap = 0, _creep = null;
+function _applyProgress(){
+  var bar = document.getElementById('loadingBar'), pct = document.getElementById('loadingPct');
+  if (bar) bar.style.width = _progressPct + '%';
+  if (pct) pct.textContent = Math.round(_progressPct) + '%';
+}
+function setProgress(v, cap){
+  _progressPct = Math.max(_progressPct, Math.min(100, v));   /* only ever forward */
+  if (cap != null) _progressCap = Math.min(99, cap);
+  _applyProgress();
+}
+function progressFromMessage(msg){
+  var ls = document.getElementById('loadingStatus');
+  /* Detect a fresh attempt: the runner re-runs the whole DO-request placement on a
+     resubmit (operator fault/timeout), and its first line each time is "Checking
+     wallet balance…". If we've already advanced, that means the task RESTARTED —
+     reset the bar backward so it doesn't sit pinned near the top. */
+  if (/checking wallet balance|resubmit|retry|restart/i.test(msg) && _progressPct > 15) {
+    stopCreep();
+    _progressPct = 0; _progressCap = 12; _applyProgress();  /* force backward (reset) */
+    if (ls) ls.textContent = 'Retrying securely…';
+    startCreep();
+  }
+  for (var i = PROGRESS_STEPS.length - 1; i >= 0; i--){
+    if (PROGRESS_STEPS[i].re.test(msg)){
+      var step = PROGRESS_STEPS[i];
+      var next = (PROGRESS_STEPS[i+1] && PROGRESS_STEPS[i+1].pct) || 99;
+      var cap = (step.cap != null) ? step.cap : next - 1;
+      setProgress(step.pct, cap);
+      if (ls) ls.textContent = step.label;
+      return;
+    }
+  }
+}
+function startCreep(){ stopCreep(); _creep = setInterval(function(){ if (_progressPct < _progressCap) setProgress(_progressPct + 0.25); }, 700); }
+function stopCreep(){ if (_creep){ clearInterval(_creep); _creep = null; } }
+function showProgress(show){
+  var wrap = document.getElementById('loadingProgressWrap'), sp = document.getElementById('loadingSpinner');
+  if (wrap) wrap.style.display = show ? 'block' : 'none';
+  if (sp) sp.style.display = 'block'; /* keep the spinner visible alongside the progress bar */
+  if (show){ _progressPct = 0; _progressCap = 8; setProgress(6); startCreep(); } else stopCreep();
+}
+function completeProgress(){ stopCreep(); setProgress(100); }
+function resetProgress(){ stopCreep(); _progressPct = 0; _progressCap = 0; _applyProgress(); }
+
+function pendKey(fid){ return 'sc2_pending_' + fid; }
+function setPending(fid, info){ try{ localStorage.setItem(pendKey(fid), JSON.stringify(info)); }catch(e){} }
+function getPending(fid){ try{ return JSON.parse(localStorage.getItem(pendKey(fid)) || 'null'); }catch(e){ return null; } }
+function clearPending(fid){ try{ localStorage.removeItem(pendKey(fid)); }catch(e){} }
+
+var _reconciling = false;
+var _activeWrite = false; /* true while a write task is in flight — blocks the reconcile
+                             tick from firing a parallel read task and double-handling the result */
+async function reconcilePending(fid){
+  fid = fid || familyId;
+  if (_reconciling || _activeWrite || !fid || !userWallet || !window.EthernityRunner) return;
+  var p = getPending(fid);
+  if (!p) return;
+  _reconciling = true;
+  try {
+    var v = await window.EthernityRunner.version(fid);            // free eth_call, no task/gas
+    if (v != null && v > (p.beforeVersion || 0)) {
+      /* A commit landed while we were away — pull the authoritative state. */
+      var readIntent = await signIntent('read_family', {});
+      var r = await window.EthernityRunner.submitRead(fid, readIntent, function(){});
+      if (r && r.state && Object.keys(r.state).length) {
+        familyState = r.state;
+        esrVersion = r.version || v;
+        if (r.nonce != null) esrNonce = r.nonce;
+        OptimisticCache.setState(fid, familyState);
+        if (typeof render === 'function') render();
+      }
+      clearPending(fid);
+      setSyncDot('green');
+      showToast('Synced a change that finished in the background');
+    } else if (Date.now() - (p.ts || 0) > 20 * 60 * 1000) {
+      clearPending(fid);           /* nothing after 20 min: order likely expired/refunded */
+      setSyncDot('grey');
+    } else {
+      setSyncDot('yellow');        /* still in flight — re-check on next resume/tick */
+    }
+  } catch(e) {
+    console.warn('reconcile failed:', e.message);
+  } finally {
+    _reconciling = false;
+  }
+}
+
+/* ===================================================================
+   BACKGROUND WRITE QUEUE — instant UI, commits in the background
+   A click applies the mutation to LOCAL state immediately (optimistic — the
+   same logic the enclave runs, via OptimisticCache.execute) and renders, so the
+   star highlights with zero delay. The real enclave commit is queued and
+   drained SERIALLY in the background, each landing with a fresh on-chain
+   getNonce()+1. The queue is persisted so unsent writes survive reload/close.
+   =================================================================== */
+var _queue = [];
+var _queueRunning = false;
+var _queueErr = 0;
+
+function _qKey(){ return 'sc2_queue_' + familyId; }
+function _saveQueue(){ try { localStorage.setItem(_qKey(), JSON.stringify(_queue)); } catch(e){} }
+function _loadQueue(){ try { _queue = JSON.parse(localStorage.getItem(_qKey()) || '[]') || []; } catch(e){ _queue = []; } }
+
+function updateSyncUI(){
+  var pending = _queue.length;
+  setSyncDot(pending > 0 || _queueRunning ? 'yellow spin' : (_queueErr ? 'red' : 'green'));
+  var c = document.getElementById('syncCount');
+  if (c) c.textContent = pending > 0 ? String(pending) : '';
+}
+
+/* Click handler: optimistic local apply + render NOW, queue the enclave commit.
+   Throws (before queueing) if the action is locally invalid, so the caller can
+   surface the error. */
+function enqueueAction(action, intentData){
+  intentData = Object.assign({}, intentData);
+  intentData.nonce = (familyState && familyState.nonce) || 0;   /* app-level ordering for OptimisticCache */
+  /* optimistic mutation — mirrors the enclave's own action_fn */
+  familyState = OptimisticCache.execute(familyId, action, Object.assign({ action: action }, intentData), userWallet.address);
+  render();
+  if (!window.EthernityRunner) return; /* enclave unavailable — optimistic cache already rendered */
+  _queue.push({ action: action, intentData: intentData, tries: 0 });
+  _saveQueue();
+  updateSyncUI();
+  drainQueue();
+}
+
+async function ensureSession(){
+  if (window.EthernityRunner.hasActiveSession()) return true;
+  try {
+    setSyncDot('yellow spin');
+    console.log('[session] opening interactive session...');
+    var info = await window.EthernityRunner.startSession();
+    console.log('[session] opened, order', info.orderId);
+    return true;
+  } catch(e){
+    console.warn('[session] failed to open:', e.message);
+    return false;
+  }
+}
+
+async function drainQueue(){
+  if (_queueRunning || !window.EthernityRunner || !userWallet || !_queue.length) return;
+  _queueRunning = true; _activeWrite = true; updateSyncUI();
+  try {
+    var useSession = await ensureSession();
+    while (_queue.length){
+      var job = _queue[0];
+      try {
+        var onNonce = esrNonce || 0;
+        try { var n = await window.EthernityRunner.nonce(familyId); if (n != null) onNonce = n; } catch(_e){}
+        var idata = Object.assign({}, job.intentData); idata.esr_nonce = onNonce + 1;
+        var intent = await signIntent(job.action, idata);
+        var result;
+        if (useSession && window.EthernityRunner.hasActiveSession()) {
+          result = await window.EthernityRunner.sessionExecute(familyId, intent);
+        } else {
+          result = await window.EthernityRunner.submitTask(familyId, intent, function(){});
+        }
+        var resStr = (typeof result === 'string') ? result : JSON.stringify(result || '');
+        if (!/ESR_NONCE_VIOLATION/i.test(resStr) && result && result.status === 'error') {
+          throw new Error(result.message || result.error || 'enclave error');
+        }
+        esrNonce = idata.esr_nonce; esrVersion = (esrVersion || 0) + 1;
+        _queue.shift(); _saveQueue(); _queueErr = 0; updateSyncUI(); render();
+      } catch(e){
+        job.tries = (job.tries || 0) + 1;
+        console.warn('queued commit failed (try ' + job.tries + '):', e && e.message);
+        if (useSession && job.tries === 1) {
+          console.log('[session] retrying via one-shot task');
+          useSession = false; continue;
+        }
+        if (job.tries < 3){ _saveQueue(); updateSyncUI(); await sleep(4000); }
+        else { _queueErr++; _queue.shift(); _saveQueue(); updateSyncUI(); render(); }
+      }
+    }
+  } finally {
+    _queueRunning = false; _activeWrite = false; updateSyncUI();
+  }
+}
+
+var _suppressWriteToast = false; /* set by callers that show their own progress UI (e.g. invite spinner) */
+async function executeIntent(action, intentData) {
+  setSyncDot('yellow spin');
+  _activeWrite = true; /* pause reconcile until this write fully returns */
+  try {
+    /* Attach current nonce so the enclave can validate ordering */
+    if (action !== 'create_family' && familyState) {
+      intentData.nonce = familyState.nonce || 0;
+    }
+    /* Exactly-once idempotency nonce = on-chain getNonce() + 1.
+       The registry now records the nonce publicly on every commit and the CONTRACT
+       enforces STRICT +1 per key (reuse/gap/stale all revert → task code 36), so we
+       read the authoritative last-accepted value for free (one eth_call) and add one.
+       This replaces the earlier max(tracked, version)+1 workaround (which could
+       produce a gap and now would revert). A retry of this same signed intent reuses
+       the same nonce → rejected as a duplicate, state untouched. */
+    if (!window.EthernityRunner) throw new Error('Enclave unavailable — cannot commit. Please reload.');
+    var _onNonce = esrNonce || 0;
+    try { var _n = await window.EthernityRunner.nonce(familyId); if (_n != null) _onNonce = _n; }
+    catch(_e) { console.warn('nonce() read failed, using tracked:', _e.message); }
+    intentData.esr_nonce = _onNonce + 1;
+    var intent = await signIntent(action, intentData);
+
+    {
+      /* ===== ETHERNITY CLOUD TEE — the only backend ===== */
+      console.log('Submitting to Ethernity Cloud TEE...');
+      if (!_suppressWriteToast) showToast('Submitting to enclave...');
+      /* Record an in-flight marker BEFORE submitting, so if this page is
+         backgrounded/closed mid-task, a later resume can reconcile. beforeVersion
+         = current on-chain version (free); the commit is detected when it advances. */
+      var beforeVersion = esrVersion || 0;
+      try { var _vv = await window.EthernityRunner.version(familyId); if (_vv != null) beforeVersion = _vv; } catch(_e) {}
+      setPending(familyId, { action: action, esr_nonce: intentData.esr_nonce, beforeVersion: beforeVersion, ts: Date.now() });
+
+      var result = await window.EthernityRunner.submitTask(familyId, intent, function(progress) {
+        var msg = progress && progress.message ? progress.message : String(progress);
+        console.log('Enclave progress:', msg);
+        progressFromMessage(msg); /* friendly status only — raw runner logs are not shown to users */
+      });
+      console.log('Enclave result:', result);
+      /* A duplicate/stale idempotency nonce comes back as task code 36
+         (ESR_NONCE_VIOLATION) — the change was already applied (or our nonce
+         lagged the chain). Don't error: re-sync from the enclave so the UI shows
+         truth and esrNonce realigns. */
+      var resStr = (typeof result === 'string') ? result : JSON.stringify(result || '');
+      if (/ESR_NONCE_VIOLATION/i.test(resStr) || (result && result.code === 36)) {
+        console.warn('Idempotency nonce already used — resyncing from enclave');
+        clearPending(familyId);
+        try {
+          var _ri = await signIntent('read_family', {});
+          var _rr = await window.EthernityRunner.submitRead(familyId, _ri, function(p){
+            progressFromMessage(p && p.message ? p.message : String(p));
+          });
+          if (_rr && _rr.state) {
+            familyState = _rr.state;
+            if (_rr.version != null) esrVersion = _rr.version;
+            if (_rr.nonce != null) esrNonce = _rr.nonce;   /* authoritative post-relay nonce */
+            OptimisticCache.setState(familyId, familyState);
+          }
+        } catch(_e) { console.warn('resync read failed:', _e.message); }
+        setSyncDot('green');
+        return familyState;
+      }
+      if (result.status === 'error') throw new Error(result.message || 'Enclave error');
+      /* The enclave returns the fresh plaintext state directly (enclave-private
+         state; the client can't decrypt the blob). No IPFS download. */
+      if (result.state !== undefined) {
+        familyState = result.state;
+        OptimisticCache.setState(familyId, familyState); /* local render cache */
+      }
+      /* IMPORTANT: the enclave reads version/nonce back PRE-relay (node-relay
+         commits are async), so result.version/result.nonce lag behind. The task
+         SUCCEEDED (no code 36), which means the esr_nonce WE SENT was accepted —
+         so track that, and advance version locally by one commit. */
+      esrNonce = intentData.esr_nonce;
+      esrVersion = Math.max((esrVersion || 0) + 1, (result.version != null ? result.version : 0));
+      clearPending(familyId); /* saw the result in-foreground — nothing to reconcile */
+      setSyncDot('green');
+    }
+
+    return familyState;
+  } catch(e) {
+    setSyncDot('red');
+    throw e;
+  } finally {
+    _activeWrite = false; /* write done (ok or error) — reconcile may resume */
+  }
+}
+
+/* ===== AUTH INIT ===== */
+async function initAuth() {
+  window._web3authInitOk = false;
+  window._web3authInitError = '';
+  try {
+    await StarChartAuth.init({ clientId: WEB3AUTH_CLIENT_ID });
+    console.log('Web3Auth init OK');
+    window._web3authInitOk = true;
+  } catch(e) {
+    console.error('Web3Auth init failed:', e);
+    window._web3authInitError = e.message || String(e);
+    document.getElementById('loginError').textContent = 'INIT: ' + window._web3authInitError;
+  }
+
+  /* Try to restore previous session */
+  try {
+    var session = await StarChartAuth.tryRestore();
+    if (session) {
+      await onSessionReady(session);
+      return;
+    }
+  } catch(e) {
+    console.warn('Session restore failed:', e.message);
+  }
+
+  showScreen('screenLogin');
+}
+
+async function onSessionReady(session) {
+  try {
+    ethersProvider = session.provider;
+    userWallet = { address: session.address, signer: session.signer };
+    userInfo = session.userInfo || { name: session.address.slice(0,6) + '...' + session.address.slice(-4) };
+
+    /* Funding gate: the embedded wallet pays task fees in tETNY — require a
+       minimum balance before the family flow; the faucet button tops it up on
+       testnet. Re-entrant: once funded, the poller calls onSessionReady again. */
+    window._lastSession = session;
+    if (!(await ensureFunded())) { showFundScreen(); return; }
+
+    /* Check if user has a saved family */
+    familyId = localStorage.getItem('sc2_family_id');
+    if (!familyId) {
+      /* New user: a brief progress sweep after login, then reveal Family Setup. */
+      showScreen('screenLoading'); resetProgress(); showProgress(true);
+      document.getElementById('loadingStatus').textContent = 'Setting things up…';
+      setProgress(45); await sleep(300); completeProgress(); await sleep(250); showProgress(false);
+      revealScreen('screenFamily');
+      document.getElementById('walletDisplay').textContent = userWallet.address;
+    } else {
+      /* Cache-gated enclave read with a step progress bar. Warm cache returns
+         almost instantly (free version check); a cold cache runs a read task
+         whose steps drive the bar. The enclave is the only source of truth. */
+      try {
+        if (!window.EthernityRunner) throw new Error('Enclave runner not loaded');
+        showScreen('screenLoading'); resetProgress(); showProgress(true);
+        document.getElementById('loadingStatus').textContent = 'Unlocking your vault…';
+        var readIntent = await signIntent('read_family', {});
+        var r = await window.EthernityRunner.submitRead(familyId, readIntent, function(p) {
+          var pm = p && p.message ? p.message : String(p);
+          progressFromMessage(pm);
+        });
+        if (r && r.state && Object.keys(r.state).length) {
+          familyState = r.state;
+          esrVersion = r.version || 0;
+          if (r.nonce != null) esrNonce = r.nonce;
+          OptimisticCache.setState(familyId, familyState); /* local render cache */
+          console.log('Family state loaded' + (r.fromCache ? ' (from cache, 0 orders)' : ' (fresh read)'));
+          completeProgress(); await sleep(300); showProgress(false);
+          unlockApp();
+        } else {
+          /* No v63 family for this id (empty state, or we're not a member): start
+             fresh — do NOT fall back to stale local state. */
+          console.log('No enclave family for stored id; showing Create screen');
+          localStorage.removeItem('sc2_family_id'); familyId = null;
+          showProgress(false);
+          revealScreen('screenFamily');
+          document.getElementById('walletDisplay').textContent = userWallet.address;
+        }
+      } catch(e) {
+        /* Enclave read error or PermissionError (not a member). Never unlock into
+           stale OptimisticCache state — send the user to Create and clear the id. */
+        console.warn('Enclave read failed — starting fresh (not a member / read error):', e.message);
+        localStorage.removeItem('sc2_family_id'); familyId = null;
+        showProgress(false);
+        revealScreen('screenFamily');
+        document.getElementById('walletDisplay').textContent = userWallet.address;
+      }
+    }
+  } catch(e) {
+    console.error('Session error:', e);
+    showScreen('screenLogin');
+    document.getElementById('loginError').textContent = e.message || 'Connection failed';
+  }
+}
+
+async function doLoginWeb3Auth() {
+  if (!window._web3authInitOk) {
+    document.getElementById('loginError').textContent = 'Init failed: ' + (window._web3authInitError || 'unknown');
+    return;
+  }
+  document.getElementById('loginStatus').textContent = 'Opening login...';
+  document.getElementById('loginError').textContent = '';
+  try {
+    var session = await StarChartAuth.loginWithWeb3Auth();
+    await onSessionReady(session);
+  } catch(e) {
+    console.error('Web3Auth login error:', e);
+    document.getElementById('loginStatus').textContent = '';
+    document.getElementById('loginError').textContent = e.message || 'Login failed';
+  }
+}
+
+async function doLoginWallet() {
+  document.getElementById('loginStatus').textContent = 'Connecting wallet...';
+  document.getElementById('loginError').textContent = '';
+  try {
+    var session = await StarChartAuth.connectWallet();
+    await onSessionReady(session);
+  } catch(e) {
+    console.error('Wallet login error:', e);
+    document.getElementById('loginStatus').textContent = '';
+    document.getElementById('loginError').textContent = e.message || 'Wallet connection failed';
+  }
+}
+
+function doLogin() { doLoginWeb3Auth(); }
+
+async function doLogout() {
+  try { if (window.EthernityRunner && window.EthernityRunner.hasActiveSession()) await window.EthernityRunner.closeSession(); } catch(e){ console.warn('session close on logout:', e.message); }
+  await StarChartAuth.logout();
+  userWallet = null;
+  userInfo = null;
+  familyId = null;
+  familyState = null;
+  document.getElementById('appContainer').style.display = 'none';
+  showScreen('screenLogin');
+}
+
+/* ===== FAMILY CREATION / JOIN ===== */
+async function createFamily() {
+  document.getElementById('familyError').textContent = '';
+  try {
+    /* Family ID = keccak256 of owner wallet + timestamp, truncated to 16 hex chars */
+    var raw = userWallet.address + '-' + Date.now();
+    var hash = ethers.keccak256(ethers.toUtf8Bytes(raw));
+    familyId = hash.slice(2, 18); /* 16 hex chars */
+
+    /* Fade the setup form down/out, then reveal the progress screen and run the
+       (multi-minute) create task with a step progress bar. */
+    await fadeOutScreen('screenFamily');
+    revealScreen('screenLoading');
+    var ls = document.getElementById('loadingStatus');
+    if (ls) ls.textContent = 'Creating your Star Chart…';
+    showProgress(true);
+
+    await executeIntent('create_family', {});
+    localStorage.setItem('sc2_family_id', familyId);
+    completeProgress();
+    await sleep(350);          /* let the bar visibly reach 100% */
+    showProgress(false);
+    /* Show the shareable Family ID before entering the app. */
+    document.getElementById('createdFamilyId').textContent = familyId;
+    revealScreen('screenFamilyCreated');
+  } catch(e) {
+    console.error(e);
+    familyId = null;
+    showProgress(false);
+    /* Back to the setup screen with the error (don't strand the user on the spinner). */
+    revealScreen('screenFamily');
+    document.getElementById('familyError').textContent = e.message || 'Failed to create family';
+    document.getElementById('walletDisplay').textContent = userWallet.address;
+  }
+}
+
+async function joinFamily() {
+  var fid = document.getElementById('joinFamilyId').value.trim().toLowerCase();
+  if (!fid || fid.length < 4) {
+    document.getElementById('familyError').textContent = 'Enter the family ID';
+    return;
+  }
+  document.getElementById('familyError').textContent = '';
+
+  if (!window.EthernityRunner) {
+    document.getElementById('familyError').textContent = 'Enclave not loaded yet — please reload and try again.';
+    return;
+  }
+
+  /* Join over the REAL enclave. read_family is member-gated: the enclave returns
+     the family's state ONLY if your wallet is on the members list — so a
+     successful read IS proof of membership. The owner must have invited your
+     wallet first (invite_member adds you + grants your ESR write ACL). */
+  familyId = fid;
+  await fadeOutScreen('screenFamily');
+  revealScreen('screenLoading'); resetProgress(); showProgress(true);
+  document.getElementById('loadingStatus').textContent = 'Unlocking the family vault…';
+  try {
+    var readIntent = await signIntent('read_family', {});
+    var r = await window.EthernityRunner.submitRead(fid, readIntent, function(p){
+      progressFromMessage(p && p.message ? p.message : String(p));
+    });
+    if (r && r.state && Object.keys(r.state).length) {
+      familyState = r.state;
+      esrVersion = r.version || 0;
+      if (r.nonce != null) esrNonce = r.nonce;
+      OptimisticCache.setState(fid, familyState); /* local render cache */
+      localStorage.setItem('sc2_family_id', fid);
+      completeProgress(); await sleep(300); showProgress(false);
+      unlockApp();
+    } else {
+      /* Empty state = no such family (nothing committed under that id). */
+      familyId = null; showProgress(false);
+      revealScreen('screenFamily');
+      document.getElementById('familyError').textContent =
+        'No family found for that ID. Double-check it, or ask the owner to invite ' + userWallet.address;
+      var wd = document.getElementById('walletDisplay'); if (wd) wd.textContent = userWallet.address;
+    }
+  } catch(e) {
+    /* read_family throws (PermissionError) when the caller is not a member. */
+    console.warn('join failed:', e && e.message);
+    familyId = null; showProgress(false);
+    revealScreen('screenFamily');
+    var notMember = /permission|not a .*member/i.test((e && e.message) || '');
+    document.getElementById('familyError').textContent = notMember
+      ? ('Your wallet isn’t a member yet. Ask the owner to invite ' + userWallet.address)
+      : ('Join failed: ' + ((e && e.message) || 'error'));
+    var wd2 = document.getElementById('walletDisplay'); if (wd2) wd2.textContent = userWallet.address;
+  }
+}
+
+/* ===== UNLOCK APP ===== */
+function unlockApp() {
+  document.querySelectorAll('.fullscreen').forEach(function(s){s.classList.add('hidden');});
+  var ac = document.getElementById('appContainer');
+  ac.style.display = 'flex';
+  ac.style.opacity = '0';
+  ac.classList.add('fade-in');
+  setTimeout(function(){ ac.style.opacity = '1'; ac.classList.remove('fade-in'); }, 400);
+
+  if (typeof Android === 'undefined') {
+    function setVH(){ ac.style.height = window.innerHeight + 'px'; }
+    setVH();
+    window.addEventListener('resize', setVH);
+  }
+
+  render();
+  setSyncDot('green');
+  reconcilePending(); /* sync any write that completed while the app was backgrounded/closed */
+  _loadQueue(); updateSyncUI(); drainQueue(); /* resume any writes queued before a reload/close */
+}
+
+/* ===== STATE ACCESSORS ===== */
+function getTasks() {
+  if (!familyState || !familyState.tasks) return [];
+  return familyState.tasks;
+}
+
+function getDayData(d) {
+  if (!familyState || !familyState.days) return {};
+  return familyState.days[d] || {};
+}
+
+function getWithdrawals() {
+  if (!familyState) return [];
+  return familyState.withdrawals || [];
+}
+
+function getAllDayKeys() {
+  if (!familyState || !familyState.days) return [];
+  return Object.keys(familyState.days).sort();
+}
+
+function getTotalEarned() {
+  var keys = getAllDayKeys(), total = 0, tasks = getTasks();
+  for (var i = 0; i < keys.length; i++) {
+    var dd = getDayData(keys[i]);
+    for (var j = 0; j < tasks.length; j++) {
+      if (dd[tasks[j].id] && !tasks[j].mandatory) total += tasks[j].points;
+    }
+  }
+  return total;
+}
+
+function getTotalWithdrawn() {
+  var w = getWithdrawals(), t = 0;
+  for (var i = 0; i < w.length; i++) t += w[i].points;
+  return t;
+}
+
+function getDayPoints(d) {
+  var dd = getDayData(d), tasks = getTasks(), p = 0;
+  for (var i = 0; i < tasks.length; i++) {
+    if (dd[tasks[i].id] && !tasks[i].mandatory) p += tasks[i].points;
+  }
+  return p;
+}
+
+/* ===== SYNC DOT ===== */
+function setSyncDot(c) {
+  var d = document.getElementById('syncDot');
+  if (d) d.className = 'sync-dot ' + c;
+}
+
+/* ===== RENDER ===== */
+function renderStars(n, size) {
+  if (n <= 0) return '';
+  var sz = size || '1em';
+  var h = '<span class="star-row" data-stars="' + n + '">';
+  for (var i = 0; i < n; i++) h += '<span style="font-size:' + sz + '">\u2B50</span>';
+  h += '</span>';
+  return h;
+}
+
+function fixStarOverlap() {
+  var rows = document.querySelectorAll('.star-row');
+  for (var r = 0; r < rows.length; r++) {
+    var row = rows[r], parent = row.parentElement;
+    if (!parent) continue;
+    var stars = row.querySelectorAll('span');
+    var n = stars.length;
+    if (n < 2) continue;
+    for (var i = 0; i < n; i++) stars[i].style.marginRight = '0';
+    var availW = parent.clientWidth;
+    var rowW = row.scrollWidth;
+    if (rowW > availW && n > 1) {
+      var starW = stars[0].offsetWidth;
+      var excess = rowW - availW;
+      var mr = -(excess / (n - 1));
+      mr = Math.max(mr, -starW * 0.6);
+      for (var i = 0; i < n - 1; i++) stars[i].style.marginRight = mr + 'px';
+    }
+  }
+}
+
+function sizeCards() {
+  var main = document.getElementById('mainContent');
+  if (!main) return;
+  var grids = main.querySelectorAll('.grid');
+  if (grids.length < 2) return;
+  var vw = main.clientWidth;
+  var minCols = 3;
+  var gap = Math.max(4, Math.round(vw * 0.015));
+  var cardSize = Math.floor((vw - gap * (minCols + 1)) / minCols);
+  if (vw > 500) {
+    var tryC = Math.floor(vw / (cardSize + gap));
+    if (tryC > minCols) { minCols = tryC; cardSize = Math.floor((vw - gap * (minCols + 1)) / minCols); }
+  }
+  cardSize = Math.max(cardSize, 40);
+  cardSize = Math.min(cardSize, 180);
+  main.style.setProperty('--card-size', cardSize + 'px');
+  main.style.setProperty('--grid-gap', gap + 'px');
+  var emojiFz = Math.round(cardSize * 0.30) + 'px';
+  var labelFz = Math.max(7, Math.round(cardSize * 0.13)) + 'px';
+  var ptsFz = Math.max(6, Math.round(cardSize * 0.10)) + 'px';
+  var allCards = main.querySelectorAll('.card');
+  for (var i = 0; i < allCards.length; i++) {
+    var e = allCards[i].querySelector('.emoji'); if (e) e.style.fontSize = emojiFz;
+    var l = allCards[i].querySelector('.label'); if (l) l.style.fontSize = labelFz;
+    var p = allCards[i].querySelector('.pts'); if (p) p.style.fontSize = ptsFz;
+  }
+}
+
+/* Correct a known-wrong stored icon at render time so existing families (whose
+   task icons are baked into committed enclave state) show the right emoji without
+   a re-commit. Only overrides the buggy safety-pin (🧷) brush icon; custom icons
+   are preserved. */
+function taskEmoji(t){
+  var e = (t && t.emoji) || '';
+  /* brush teeth shipped with 🧷 (safety pin, U+1F9F7) in enclave state and 🦷
+     (tooth, U+1F9B7) in the local default — normalize both to 🪥 (U+1FAA5). */
+  if (t && t.id === 'brush' && (e === '' || e === '🧷' || e === '🦷')) return '🪥';
+  return e;
+}
+function render() {
+  familyState = OptimisticCache.getState(familyId);
+  /* chores with an unconfirmed enclave commit still in the background queue */
+  var _pend = {};
+  for (var _q = 0; _q < _queue.length; _q++) {
+    var _j = _queue[_q];
+    if (_j && _j.intentData && _j.intentData.chore_id) _pend[_j.intentData.chore_id] = true;
+  }
+  var tasks = getTasks(), d = today(), dd = getDayData(d), m = [], o = [];
+  for (var i = 0; i < tasks.length; i++) { if (tasks[i].mandatory) m.push(tasks[i]); else o.push(tasks[i]); }
+  var am = true;
+  for (var i = 0; i < m.length; i++) if (!dd[m[i].id]) am = false;
+  var pts = 0;
+  for (var i = 0; i < o.length; i++) if (dd[o[i].id]) pts += o[i].points;
+  document.getElementById('starCount').innerHTML = pts > 0 ? renderStars(pts, '1.4em') : '<span style="opacity:.4">\u2B50</span>';
+  var co = 0;
+  for (var i = 0; i < o.length; i++) if (dd[o[i].id]) co++;
+  document.getElementById('statusMsg').textContent = !am ? 'Finish chores first!' : co === o.length ? 'All chores done! \uD83C\uDF89' : 'Keep going! You can earn more \u2B50';
+
+  var h = '<div class="section-title">\uD83D\uDCAA Must Do</div><div class="grid">';
+  for (var i = 0; i < m.length; i++) {
+    var t = m[i], dn = !!dd[t.id];
+    h += '<div class="card' + (dn ? ' done' : ' mandatory-bg') + (_pend[t.id] ? ' pending' : '') + '" onclick="tap(\'' + esc(t.id) + '\')" id="card-' + esc(t.id) + '">';
+    if (_pend[t.id]) h += '<span class="syncing">\u23f3</span>';
+    if (dn) h += '<span class="check">\u2705</span>';
+    h += '<span class="emoji">' + esc(taskEmoji(t)) + '</span><span class="label">' + esc(t.name) + '</span></div>';
+  }
+  h += '</div><div class="section-title">\u2B50 Earn Stars</div><div class="grid">';
+  for (var i = 0; i < o.length; i++) {
+    var t = o[i], dn = !!dd[t.id], lk = !am, c = 'card optional';
+    if (dn) c += ' done'; else if (lk) c += ' locked';
+    if (_pend[t.id]) c += ' pending';
+    h += '<div class="' + c + '" onclick="tap(\'' + esc(t.id) + '\')" id="card-' + esc(t.id) + '">';
+    if (_pend[t.id]) h += '<span class="syncing">\u23f3</span>';
+    if (dn) h += '<span class="check">\u2705</span>';
+    else if (lk) h += '<span class="lock">\uD83D\uDD12</span>';
+    h += '<span class="emoji">' + esc(taskEmoji(t)) + '</span><span class="label">' + esc(t.name) + '</span><span class="pts">' + renderStars(t.points, '.7em') + '</span></div>';
+  }
+  h += '</div>';
+  document.getElementById('mainContent').innerHTML = h;
+  setTimeout(function(){ sizeCards(); fixStarOverlap(); }, 0);
+}
+window.addEventListener('resize', function(){ sizeCards(); fixStarOverlap(); });
+
+/* ===== TAP (toggle chore) ===== */
+async function tap(id) {
+  var tasks = getTasks(), d = today(), dd = getDayData(d), task = null;
+  for (var i = 0; i < tasks.length; i++) if (tasks[i].id === id) task = tasks[i];
+  if (!task) return;
+
+  var was = !!dd[id];
+
+  if (!was && !task.mandatory) {
+    var mand = tasks.filter(function(t){ return t.mandatory; });
+    var allDone = mand.every(function(t){ return !!dd[t.id]; });
+    if (!allDone) { showToast('\uD83D\uDD12 Finish the must-do chores first!'); return; }
+  }
+
+  try {
+    if (was) {
+      enqueueAction('uncomplete_chore', { date: d, chore_id: id });
+    } else {
+      enqueueAction('complete_chore', { date: d, chore_id: id });
+      if (!task.mandatory) confetti();
+    }
+    render();
+    var el = document.getElementById('card-' + id);
+    if (el) { el.classList.remove('bounce'); void el.offsetWidth; el.classList.add('bounce'); }
+  } catch(e) {
+    showErrorModal(e.message || 'Failed', 'Task Failed');
+  }
+}
+
+/* ===== TOAST ===== */
+var toastTimer = null;
+function showToast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(function(){ t.classList.remove('show'); }, 2000);
+}
+
+function showErrorModal(msg, title) {
+  document.getElementById('errorTitle').textContent = title || 'Something went wrong';
+  document.getElementById('errorMessage').textContent = msg || 'An unknown error occurred.';
+  openOverlay('errorOverlay');
+}
+
+/* ===== CONFETTI ===== */
+function confetti() {
+  var c = ['#FF9B35','#FFEE3F','#4CAF50','#E53935','#2196F3','#9C27B0'];
+  for (var i = 0; i < 20; i++) {
+    var e = document.createElement('div');
+    e.className = 'confetti-piece';
+    e.style.left = Math.random() * 100 + 'vw';
+    e.style.top = (Math.random() * 30 + 10) + 'vh';
+    e.style.background = c[Math.floor(Math.random() * c.length)];
+    e.style.width = (Math.random() * 6 + 5) + 'px';
+    e.style.height = e.style.width;
+    e.style.animationDuration = (Math.random() * 0.6 + 0.8) + 's';
+    document.body.appendChild(e);
+    (function(x){ setTimeout(function(){ if (x.parentNode) x.parentNode.removeChild(x); }, 1500); })(e);
+  }
+}
+
+/* ===== OVERLAYS ===== */
+function closeOverlay(id) { document.getElementById(id).classList.remove('active'); }
+function openOverlay(id) { document.getElementById(id).classList.add('active'); }
+
+/* ADD TASK */
+function openAddTask() {
+  document.getElementById('newTaskName').value = '';
+  document.getElementById('newTaskPoints').value = '2';
+  document.getElementById('newTaskMandatory').classList.remove('on');
+  selectedEmoji = EMOJIS[0];
+  renderEmojiPicker();
+  openOverlay('addTaskOverlay');
+}
+function renderEmojiPicker() {
+  var h = '';
+  for (var i = 0; i < EMOJIS.length; i++) h += '<span class="' + (EMOJIS[i] === selectedEmoji ? 'selected' : '') + '" onclick="pickEmoji(' + i + ')">' + EMOJIS[i] + '</span>';
+  document.getElementById('emojiPicker').innerHTML = h;
+}
+function pickEmoji(i) { selectedEmoji = EMOJIS[i]; renderEmojiPicker(); }
+function toggleMandatory() {
+  var e = document.getElementById('newTaskMandatory');
+  e.classList.toggle('on');
+  if (e.classList.contains('on')) document.getElementById('newTaskPoints').value = '0';
+}
+async function addTask() {
+  var n = document.getElementById('newTaskName').value.trim();
+  if (!n) { showToast('Enter a task name!'); return; }
+  var p = parseInt(document.getElementById('newTaskPoints').value) || 0;
+  var m = document.getElementById('newTaskMandatory').classList.contains('on');
+  if (m) p = 0;
+  var task = { id: 'custom_' + Date.now(), name: n, emoji: selectedEmoji, points: p, mandatory: m };
+  try {
+    enqueueAction('add_task', { task: task });
+    closeOverlay('addTaskOverlay');
+    render();
+    showToast('Task added!');
+  } catch(e) {
+    showToast('Error: ' + (e.message || 'Failed'));
+  }
+}
+
+/* REPORT */
+function openReport() {
+  var d = today(), dd = getDayData(d), tasks = getTasks(), pts = getDayPoints(d), done = [];
+  for (var i = 0; i < tasks.length; i++) if (dd[tasks[i].id]) done.push(tasks[i]);
+  var h = '<div class="stat-row"><span class="stat-label">Date</span><span class="stat-value">' + d + '</span></div><div class="stat-row"><span class="stat-label">Stars</span><span class="stat-value">' + renderStars(pts, '1em') + '</span></div><div class="stat-row"><span class="stat-label">Tasks</span><span class="stat-value">' + done.length + '/' + tasks.length + '</span></div><h3 style="margin:12px 0 6px">Completed</h3>';
+  if (!done.length) h += '<p style="color:var(--muted)">None yet</p>';
+  for (var i = 0; i < done.length; i++) {
+    var t = done[i];
+    h += '<div class="task-item">' + esc(taskEmoji(t)) + ' ' + esc(t.name) + (t.mandatory ? '' : ' ' + renderStars(t.points, '.85em')) + '</div>';
+  }
+  document.getElementById('reportContent').innerHTML = h;
+  openOverlay('reportOverlay');
+}
+
+/* HISTORY */
+function openHistory() {
+  var k = getAllDayKeys();
+  k.sort().reverse();
+  var h = '';
+  if (!k.length) h = '<p style="color:var(--muted);text-align:center;padding:20px">No history yet</p>';
+  for (var i = 0; i < k.length && i < 30; i++) {
+    var dp = getDayPoints(k[i]);
+    h += '<div class="history-item" onclick="showDetail(\'' + esc(k[i]) + '\')"><span class="history-date">' + esc(k[i]) + '</span><span class="history-pts">' + dp + ' \u2B50</span></div>';
+  }
+  document.getElementById('historyContent').innerHTML = h;
+  openOverlay('historyOverlay');
+}
+function showDetail(d) {
+  var dd = getDayData(d), tasks = getTasks(), pts = getDayPoints(d), done = [];
+  document.getElementById('historyDetailTitle').textContent = d;
+  for (var i = 0; i < tasks.length; i++) if (dd[tasks[i].id]) done.push(tasks[i]);
+  var h = '<div class="stat-row"><span class="stat-label">Stars</span><span class="stat-value">' + pts + ' \u2B50</span></div><div class="stat-row"><span class="stat-label">Tasks</span><span class="stat-value">' + done.length + '</span></div><h3 style="margin:12px 0 6px">Completed</h3>';
+  for (var i = 0; i < done.length; i++) {
+    var t = done[i];
+    h += '<div class="task-item">' + esc(taskEmoji(t)) + ' ' + esc(t.name) + (t.mandatory ? '' : ' ' + t.points + ' \u2B50') + '</div>';
+  }
+  document.getElementById('historyDetailContent').innerHTML = h;
+  openOverlay('historyDetailOverlay');
+}
+
+/* MONEY */
+function openMoney() {
+  var e = getTotalEarned(), w = getTotalWithdrawn(), b = e - w, eu = (b / 10).toFixed(2), ws = getWithdrawals();
+  var h = '<div style="text-align:center;padding:10px 0"><div style="font-weight:800;font-size:1.8em">' + b + ' \u2B50</div><div style="font-size:1.1em;color:var(--muted);margin:4px 0">Available</div><div style="font-size:1.8em;font-weight:700;color:var(--green);margin:8px 0">\u20AC' + eu + '</div><div style="font-size:.85em;color:var(--muted)">10 pts = \u20AC1</div></div>';
+  if (b > 0) h += '<button class="btn btn-green" onclick="cashOut()" style="margin:12px 0">\uD83D\uDCB0 Cash out! (\u20AC' + eu + ')</button>';
+  if (ws.length) {
+    h += '<h3 style="margin:12px 0 6px">Withdrawals</h3>';
+    for (var i = ws.length - 1; i >= 0; i--) h += '<div class="withdrawal-item"><strong>\u20AC' + (ws[i].points / 10).toFixed(2) + '</strong> (' + ws[i].points + ' \u2B50) &mdash; ' + esc(ws[i].date) + '</div>';
+  }
+  document.getElementById('moneyContent').innerHTML = h;
+  openOverlay('moneyOverlay');
+}
+async function cashOut() {
+  var e = getTotalEarned(), w = getTotalWithdrawn(), b = e - w;
+  if (b <= 0) return;
+  if (!confirm('Cash out \u20AC' + (b / 10).toFixed(2) + '? This will reset your star balance.')) return;
+  try {
+    enqueueAction('withdraw', { points: b, euros: (b / 10).toFixed(2), date: today() });
+    confetti();
+    render();
+    showToast('\uD83D\uDCB0 Cashed out \u20AC' + (b / 10).toFixed(2) + '!');
+    openMoney();
+  } catch(e) {
+    showToast('Error: ' + (e.message || 'Failed'));
+  }
+}
+
+/* ADMIN */
+function openAdmin() { showAdminPanel(); }
+function showAdminPanel() {
+  var e = getTotalEarned(), w = getTotalWithdrawn(), b = e - w, k = getAllDayKeys(), da = k.length, avg = da > 0 ? (e / da).toFixed(1) : '0';
+  var str = 0, d = new Date();
+  for (var i = 0; i < 365; i++) { if (getDayPoints(d.toISOString().slice(0, 10)) > 0) str++; else if (i > 0) break; d.setDate(d.getDate() - 1); }
+
+  var h = '<div class="stat-row"><span class="stat-label">Total Earned</span><span class="stat-value">' + e + ' \u2B50</span></div>';
+  h += '<div class="stat-row"><span class="stat-label">Withdrawn</span><span class="stat-value">' + w + ' \u2B50 (\u20AC' + (w / 10).toFixed(2) + ')</span></div>';
+  h += '<div class="stat-row"><span class="stat-label">Balance</span><span class="stat-value">' + b + ' \u2B50 (\u20AC' + (b / 10).toFixed(2) + ')</span></div>';
+  h += '<div class="stat-row"><span class="stat-label">Days Active</span><span class="stat-value">' + da + '</span></div>';
+  h += '<div class="stat-row"><span class="stat-label">Avg/Day</span><span class="stat-value">' + avg + ' \u2B50</span></div>';
+  h += '<div class="stat-row"><span class="stat-label">Streak</span><span class="stat-value">' + str + ' days</span></div>';
+
+  var rc = k.slice(-14);
+  if (rc.length) {
+    var mx = 1;
+    for (var i = 0; i < rc.length; i++) { var p = getDayPoints(rc[i]); if (p > mx) mx = p; }
+    h += '<h3 style="margin:14px 0 6px">Last ' + rc.length + ' days</h3><div class="chart-container">';
+    for (var i = 0; i < rc.length; i++) {
+      var p = getDayPoints(rc[i]);
+      h += '<div class="chart-bar-row"><span class="chart-date">' + esc(rc[i].slice(5)) + '</span><div class="chart-bar" style="width:' + Math.round(p / mx * 100) + '%"></div><span class="chart-val">' + p + ' \u2B50</span></div>';
+    }
+    h += '</div>';
+  }
+
+  h += '<h3 style="margin:14px 0 6px">Manage Tasks</h3>';
+  var at = getTasks();
+  for (var i = 0; i < at.length; i++) {
+    var t = at[i];
+    h += '<div class="stat-row"><span class="stat-label">' + esc(taskEmoji(t)) + ' ' + esc(t.name) + (t.mandatory ? ' (must do)' : ' ' + t.points + ' \u2B50') + '</span><span class="stat-value"><button onclick="deleteTask(\'' + esc(t.id) + '\')" style="background:#E53935;color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:.85em;cursor:pointer">\u2716</button></span></div>';
+  }
+
+  document.getElementById('adminContent').innerHTML = h;
+  openOverlay('adminOverlay');
+}
+
+async function deleteTask(id) {
+  try {
+    enqueueAction('remove_task', { task_id: id });
+    render();
+    showAdminPanel();
+    showToast('Task deleted!');
+  } catch(e) {
+    showToast('Error: ' + (e.message || 'Failed'));
+  }
+}
+
+/* SYNC/INFO */
+function openSync() {
+  var h = '';
+
+  /* User info */
+  if (userInfo) {
+    var authSession = StarChartAuth.getSession();
+    var authMethod = authSession ? authSession.method : 'wallet';
+    var isWeb3Auth = authMethod === 'web3auth';
+    h += '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #eee;margin-bottom:10px">';
+    if (userInfo.profileImage) {
+      h += '<img src="' + esc(userInfo.profileImage) + '" alt="" style="width:36px;height:36px;border-radius:50%">';
+    } else {
+      h += '<div style="width:36px;height:36px;border-radius:50%;background:' + (isWeb3Auth ? '#4285F4' : '#E2761B') + ';display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:1.2em">' + (isWeb3Auth ? 'W' : '\uD83E\uDD8A') + '</div>';
+    }
+    h += '<div><div style="font-weight:700;font-size:.95em">' + esc(userInfo.name || userInfo.email || '') + '</div>';
+    h += '<div style="font-size:.8em;color:var(--muted)">' + (isWeb3Auth ? 'Web3Auth (embedded wallet)' : 'MetaMask wallet') + '</div>';
+    h += '</div></div>';
+  }
+
+  /* Wallet */
+  h += '<div class="backup-section"><h3>Wallet</h3>';
+  h += '<div style="font-family:monospace;font-size:.8em;word-break:break-all;padding:8px;background:#f0f0f0;border-radius:8px">' + esc(userWallet ? userWallet.address : 'Not connected') + '</div>';
+  var walletNote = isWeb3Auth
+    ? 'Embedded wallet from Web3Auth. Same social login = same wallet.'
+    : 'Your MetaMask wallet. This wallet signs all state mutations.';
+  h += '<p class="setup-note">' + walletNote + '</p></div>';
+
+  /* Family info */
+  h += '<div class="backup-section"><h3>Family</h3>';
+  h += '<div style="font-family:monospace;font-size:.9em;font-weight:700;text-align:center;padding:8px;background:#f0f0f0;border-radius:8px;letter-spacing:2px">' + esc(familyId || 'None') + '</div>';
+  if (familyState) {
+    h += '<p class="setup-note">Owner: ' + esc(familyState.owner) + '</p>';
+    h += '<p class="setup-note">Members: ' + familyState.members.length + '</p>';
+    var isOwner = userWallet && familyState.owner.toLowerCase() === userWallet.address.toLowerCase();
+
+    /* Member list */
+    h += '<div style="margin-top:8px">';
+    familyState.members.forEach(function(m) {
+      var isMe = userWallet && m.toLowerCase() === userWallet.address.toLowerCase();
+      h += '<div style="padding:4px 0;font-size:.8em;font-family:monospace;word-break:break-all">';
+      h += esc(m);
+      if (m.toLowerCase() === familyState.owner.toLowerCase()) h += ' <span style="color:#4a7c3f;font-family:sans-serif">(owner)</span>';
+      if (isMe) h += ' <span style="color:var(--orange);font-family:sans-serif">(you)</span>';
+      h += '</div>';
+    });
+    h += '</div>';
+
+    /* Invite member (owner only) */
+    if (isOwner) {
+      h += '<div style="margin-top:12px"><label style="font-weight:600;font-size:.85em">Invite wallet address:</label>';
+      h += '<input type="text" id="inviteWallet" placeholder="0x..." style="width:100%;padding:8px;border:2px solid #ddd;border-radius:8px;font-size:.85em;font-family:monospace;margin:4px 0">';
+      h += '<button class="btn btn-orange" id="inviteBtn" onclick="inviteMember()" style="font-size:.9em">Invite</button>';
+      h += '<div class="invite-busy" id="inviteBusy" style="display:none"><span class="spinner-sm"></span><span id="inviteBusyText" style="font-size:.82em;color:var(--muted)">Updating on-chain…</span></div></div>';
+    }
+  }
+  h += '</div>';
+
+  /* State info */
+  h += '<div class="backup-section"><h3>On-Chain State (ESR)</h3>';
+  h += '<p class="setup-note"><strong>Contract:</strong> <span style="font-family:monospace;font-size:.75em">' + esc(ESR_ADDRESS) + '</span></p>';
+  h += '<p class="setup-note"><strong>Chain:</strong> Bloxberg (chain ID 8995)</p>';
+  h += '<p class="setup-note"><strong>ESR Version:</strong> ' + esrVersion + '</p>';
+  h += '<p class="setup-note"><strong>State Nonce:</strong> ' + (familyState ? (familyState.nonce || 0) : 'N/A') + '</p>';
+  if (familyState) {
+    h += '<p class="setup-note"><strong>State Hash:</strong> <span style="font-family:monospace;font-size:.75em;word-break:break-all">' + esc(stateHash(familyState).slice(0,18)) + '...</span></p>';
+  }
+  h += '<p class="setup-note"><strong>Execution Mode:</strong> <span style="font-weight:700;color:#4CAF50">Ethernity Cloud TEE</span></p>';
+  h += '<p class="setup-note">Every read and write goes to the StarChart enclave running in an SGX Trusted Execution Environment on Ethernity Cloud. The enclave validates and processes mutations and commits state to the ESR contract on Bloxberg via the node relay. The chain is the only source of truth.</p>';
+  h += '<p class="setup-note"><strong>Sync status:</strong> <span id="syncStatusText" style="font-weight:700">' + (esrVersion > 0 ? 'Synced (v' + esrVersion + ')' : 'Not yet synced') + '</span></p>';
+  h += '<p class="setup-note" style="color:#E53935">Note: Writes need Bloxberg gas (berg). Without gas, changes highlight instantly but stay queued until the commit can land.</p>';
+  h += '<button class="btn-outline" onclick="requestFaucet()">Get tETNY (testnet tokens)</button>';
+  h += '<p class="setup-note" id="faucetStatus"></p>';
+  h += '<button class="btn-outline" onclick="manualSync()">Resync from chain</button></div>';
+
+  h += '<div class="backup-section"><h3>Architecture</h3>';
+  h += '<p class="setup-note"><strong>Auth:</strong> ' + (isWeb3Auth ? 'Web3Auth (Google/social &rarr; embedded wallet)' : 'MetaMask / Browser Wallet') + '</p>';
+  h += '<p class="setup-note"><strong>Processing:</strong> Ethernity Cloud TEE (SGX enclave)</p>';
+  h += '<p class="setup-note"><strong>Storage:</strong> enclave state + ESR contract (Bloxberg). localStorage is only an optimistic render cache.</p></div>';
+
+  /* Sign out */
+  h += '<div class="backup-section"><button class="btn-outline" onclick="resetAll()">Sign Out / Reset</button></div>';
+
+  document.getElementById('syncContent').innerHTML = h;
+  openOverlay('syncOverlay');
+  /* Repaint from the API (source of truth) — the runner caches reads, so this is
+     cheap. The local state is only a first-paint cache; the enclave decides. */
+  refreshFamilyPanel();
+}
+
+var _syncPanelRefreshing = false;
+async function refreshFamilyPanel(){
+  if (_syncPanelRefreshing || !familyId || !window.EthernityRunner || !userWallet) return;
+  _syncPanelRefreshing = true;
+  var sig = function(){ return familyState ? ((familyState.members||[]).join(',') + '|' + (familyState.nonce||0) + '|' + esrVersion) : ''; };
+  var before = sig();
+  try {
+    var ri = await signIntent('read_family', {});
+    var rr = await window.EthernityRunner.submitRead(familyId, ri, function(){});
+    if (rr && rr.state && rr.state.members) {
+      familyState = rr.state;
+      if (rr.version != null) esrVersion = rr.version;
+      if (rr.nonce != null) esrNonce = rr.nonce;
+      OptimisticCache.setState(familyId, familyState); /* keep the render cache aligned with truth */
+      var overlay = document.getElementById('syncOverlay');
+      if (sig() !== before && overlay && overlay.classList.contains('active')) {
+        /* preserve anything the owner is mid-typing before repainting */
+        var typed = (document.getElementById('inviteWallet') || {}).value || '';
+        openSync();
+        var inp = document.getElementById('inviteWallet'); if (inp && typed) inp.value = typed;
+      }
+    }
+  } catch(e) { console.warn('family panel refresh failed:', e && e.message); }
+  finally { _syncPanelRefreshing = false; }
+}
+
+function setInviteBusy(on, text){
+  var b = document.getElementById('inviteBtn');
+  var busy = document.getElementById('inviteBusy');
+  var t = document.getElementById('inviteBusyText');
+  if (b){ b.disabled = on; b.style.opacity = on ? '.5' : '1'; b.style.pointerEvents = on ? 'none' : 'auto'; }
+  if (busy) busy.style.display = on ? 'flex' : 'none';
+  if (t && text) t.textContent = text;
+}
+
+async function inviteMember() {
+  var wallet = (document.getElementById('inviteWallet').value || '').trim().toLowerCase();
+  if (!wallet || !wallet.startsWith('0x') || wallet.length !== 42) {
+    showToast('Enter a valid wallet address (0x...)');
+    return;
+  }
+  if (familyState && wallet === (familyState.owner || '').toLowerCase()) {
+    showToast('That wallet is the owner — already has full access');
+    return;
+  }
+  /* A visible spinner runs from click until the ESR commit is accepted. No debug
+     toasts in between — executeIntent's chatter is muted via _suppressWriteToast. */
+  _suppressWriteToast = true;
+  setInviteBusy(true, 'Checking current members…');
+  try {
+    /* Member management is correctness-critical (it grants ESR read/write access)
+       and infrequent, so it does NOT use the optimistic star-click queue — that
+       queue judges "already a member" against a LOCAL shadow of state that can
+       drift from the enclave. Read the authoritative member list from the enclave,
+       decide against THAT, then commit in the foreground so the write completes. */
+    if (window.EthernityRunner) {
+      try {
+        var ri = await signIntent('read_family', {});
+        var rr = await window.EthernityRunner.submitRead(familyId, ri, function(){});
+        if (rr && rr.state && rr.state.members) {
+          familyState = rr.state;
+          if (rr.version != null) esrVersion = rr.version;
+          if (rr.nonce != null) esrNonce = rr.nonce;
+          OptimisticCache.setState(familyId, familyState); /* realign the optimistic cache with truth */
+          render();
+        }
+      } catch(e) { console.warn('pre-invite read failed, proceeding:', e && e.message); }
+    }
+    var members = ((familyState && familyState.members) || []).map(function(m){ return (m || '').toLowerCase(); });
+    if (members.indexOf(wallet) !== -1) {
+      setInviteBusy(false);
+      showToast('That wallet is already a member');
+      openSync();
+      return;
+    }
+    setInviteBusy(true, 'Sending to enclave & updating on-chain… (this can take a minute)');
+    await executeIntent('invite_member', { wallet: wallet });
+    setInviteBusy(true, 'Confirmed on-chain ✓');
+    var iw = document.getElementById('inviteWallet'); if (iw) iw.value = '';
+    showToast('Member invited — they now have access to this family');
+    openSync(); /* repaint the panel with the new member (also clears the spinner) */
+  } catch(e) {
+    setInviteBusy(false);
+    showToast('Invite failed: ' + (e.message || 'try again'));
+  } finally {
+    _suppressWriteToast = false;
+  }
+}
+
+async function manualSync() {
+  /* Chain-only: there is no client-side commit. Writes commit themselves through
+     the enclave; this just re-reads the authoritative state from the enclave. */
+  if (!familyId) { showToast('No family to sync'); return; }
+  if (!window.EthernityRunner) { showToast('Enclave not loaded — reload and retry'); return; }
+  showToast('Resyncing from chain…');
+  try {
+    var ri = await signIntent('read_family', {});
+    var r = await window.EthernityRunner.submitRead(familyId, ri, function(){});
+    if (r && r.state && Object.keys(r.state).length) {
+      familyState = r.state;
+      if (r.version != null) esrVersion = r.version;
+      if (r.nonce != null) esrNonce = r.nonce;
+      OptimisticCache.setState(familyId, familyState);
+      render();
+      showToast('Up to date (v' + esrVersion + ')');
+    } else {
+      showToast('No state found on chain for this family');
+    }
+    openSync(); /* refresh panel */
+  } catch(e) {
+    showToast('Resync failed: ' + (e.message || 'try again'));
+  }
+}
+
+var ETNY_ADDRESS = '0x02882F03097fE8cD31afbdFbB5D72a498B41112c';
+var ETNY_ABI = ['function faucet() returns (bool)', 'function balanceOf(address) view returns (uint256)', 'function decimals() view returns (uint8)'];
+
+async function requestFaucet() {
+  if (!userWallet || !userWallet.signer) { showToast('Not logged in'); return; }
+  var el = document.getElementById('faucetStatus');
+  el.textContent = 'Requesting tETNY from faucet...';
+  try {
+    var etny = new ethers.Contract(ETNY_ADDRESS, ETNY_ABI, userWallet.signer);
+    var tx = await etny.faucet();
+    el.textContent = 'Tx sent: ' + tx.hash.slice(0,14) + '... waiting for confirmation...';
+    var receipt = await tx.wait();
+    if (receipt && receipt.status === 1) {
+      var bal = await etny.balanceOf(userWallet.address);
+      var dec = await etny.decimals();
+      el.textContent = 'Faucet success! Balance: ' + ethers.formatUnits(bal, dec) + ' tETNY';
+      showToast('Got tETNY tokens!');
+    } else {
+      el.textContent = 'Faucet tx failed';
+    }
+  } catch(e) {
+    console.error('Faucet error:', e);
+    el.textContent = 'Faucet error: ' + (e.reason || e.message || e);
+  }
+}
+
+/* ===== POST-LOGIN FUNDING GATE =====
+   The embedded wallet pays task fees in the network token (tETNY) AND needs a
+   little native gas (BERGS). Faucet links are network-specific. */
+var MIN_TETNY = 10;
+var MIN_GAS = 0.005;   /* native gas: enough for the faucet tx + a few task fees */
+var _fundTimer = null, _lastBal = null, _lastGas = null;
+/* Per-network token + faucet map (keyed by chainId). */
+var FUND_NETWORKS = {
+  8995: { name: 'Bloxberg testnet', gasSymbol: 'BERGS', tokenSymbol: 'tETNY',
+          gasFaucet: 'https://faucet.bloxberg.org/', tokenFaucet: 'https://faucet.ethernity.cloud' }
+};
+var FUND_CHAIN_ID = 8995;
+function fundNet(){ return FUND_NETWORKS[FUND_CHAIN_ID] || FUND_NETWORKS[8995]; }
+function fundProvider(){ return new ethers.JsonRpcProvider(BLOXBERG_RPC, { chainId: FUND_CHAIN_ID, name: 'bloxberg' }); }
+async function tetnyBalance(){
+  var t = new ethers.Contract(ETNY_ADDRESS, ETNY_ABI, fundProvider());
+  return Number(ethers.formatUnits(await t.balanceOf(userWallet.address), 18));
+}
+async function gasBalance(){ return Number(ethers.formatEther(await fundProvider().getBalance(userWallet.address))); }
+async function readBalances(){ _lastGas = await gasBalance(); _lastBal = await tetnyBalance(); }
+async function ensureFunded(){
+  try { await readBalances(); return _lastGas >= MIN_GAS && _lastBal >= MIN_TETNY; }
+  catch(e){ console.warn('balance check failed (not blocking):', e.message); return true; }
+}
+function updateFundUI(){
+  var ni = fundNet();
+  var gEl = document.getElementById('fundGas');
+  if (gEl) gEl.innerHTML = '<span class="tok-bergs"></span>' + ni.gasSymbol + ' (gas): ' + (_lastGas != null ? _lastGas.toFixed(4) : '…') + '  (need ≥ ' + MIN_GAS + ')';
+  var tEl = document.getElementById('fundBalance');
+  if (tEl) tEl.innerHTML = '<span class="tok-etny"></span>' + ni.tokenSymbol + ': ' + (_lastBal != null ? _lastBal.toFixed(2) : '…') + '  (need ≥ ' + MIN_TETNY + ')';
+  var needGas = (_lastGas != null && _lastGas < MIN_GAS);
+  var needTok = (_lastBal != null && _lastBal < MIN_TETNY);
+  var gBtn = document.getElementById('fundGasBtn'); if (gBtn) gBtn.style.display = needGas ? 'block' : 'none';
+  var fBtn = document.getElementById('fundFaucetBtn');
+  if (fBtn){ fBtn.style.display = needTok ? 'block' : 'none'; fBtn.disabled = needGas; fBtn.style.opacity = needGas ? '0.5' : '1'; }
+  var hint = document.getElementById('fundHint');
+  /* Gas must come first — the token faucet tx itself needs gas. */
+  if (hint) hint.textContent = needGas ? ('Get ' + ni.gasSymbol + ' gas first, then claim ' + ni.tokenSymbol + '.') : '';
+}
+function _fallbackCopy(text){
+  try { var ta = document.createElement('textarea'); ta.value = text; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.focus(); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); } catch(e){}
+}
+function copyFundAddr(){
+  var a = (userWallet && userWallet.address) || ((document.getElementById('fundAddr')||{}).textContent || '').trim();
+  if (!a || a === '…') { showToast('Address not ready'); return; }
+  var flash = function(){
+    var b = document.getElementById('fundCopyBtn');
+    if (b) { var t = b.innerHTML; b.innerHTML = '✓ Copied'; setTimeout(function(){ b.innerHTML = t; }, 1500); }
+    showToast('Wallet address copied');
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(a).then(flash).catch(function(){ _fallbackCopy(a); flash(); });
+  } else { _fallbackCopy(a); flash(); }
+}
+function copyFamilyId(){
+  var a = ((document.getElementById('createdFamilyId')||{}).textContent || familyId || '').trim();
+  if (!a || a === '…') { showToast('Family ID not ready'); return; }
+  var flash = function(){
+    var b = document.getElementById('famIdCopyBtn');
+    if (b) { var t = b.innerHTML; b.innerHTML = '✓ Copied'; setTimeout(function(){ b.innerHTML = t; }, 1500); }
+    showToast('Family ID copied');
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(a).then(flash).catch(function(){ _fallbackCopy(a); flash(); }); }
+  else { _fallbackCopy(a); flash(); }
+}
+function enterAppFromCreated(){ unlockApp(); }
+
+function openGasFaucet(){
+  try { navigator.clipboard.writeText(userWallet.address); showToast('Address copied — paste it in the faucet'); } catch(e){}
+  window.open(fundNet().gasFaucet, '_blank', 'noopener');
+}
+function showFundScreen(){
+  revealScreen('screenFund');
+  updateFundUI();
+  var a = document.getElementById('fundAddr'); if (a) a.textContent = userWallet.address;
+  startFundPolling();
+}
+async function fundRecheck(){
+  try {
+    await readBalances();
+    updateFundUI();
+    if (_lastGas >= MIN_GAS && _lastBal >= MIN_TETNY){ stopFundPolling(); showToast('Funded — continuing…'); if (window._lastSession) onSessionReady(window._lastSession); }
+  } catch(e){ console.warn('recheck failed:', e.message); }
+}
+function startFundPolling(){ stopFundPolling(); _fundTimer = setInterval(fundRecheck, 8000); }
+function stopFundPolling(){ if (_fundTimer){ clearInterval(_fundTimer); _fundTimer = null; } }
+async function fundFaucetDrip(){
+  var st = document.getElementById('fundStatus');
+  var ni = fundNet();
+  if (!userWallet || !userWallet.signer){ showToast('Not logged in'); return; }
+  if (_lastGas != null && _lastGas < MIN_GAS){
+    if (st) st.textContent = 'Get ' + ni.gasSymbol + ' gas first (the faucet claim needs gas).';
+    return;
+  }
+  if (st) st.textContent = 'Requesting 1000 ' + ni.tokenSymbol + ' from the faucet…';
+  try {
+    var etny = new ethers.Contract(ETNY_ADDRESS, ETNY_ABI, userWallet.signer);
+    var tx = await etny.faucet();
+    if (st) st.textContent = 'Faucet tx ' + tx.hash.slice(0,12) + '… confirming…';
+    await tx.wait();
+    if (st) st.textContent = 'Tokens received! Checking balance…';
+    await fundRecheck();
+  } catch(e){
+    console.error('faucet error', e);
+    var msg = e.reason || e.message || String(e);
+    if (/insufficient funds/i.test(msg)) msg = 'Need ' + ni.gasSymbol + ' (gas) first — tap “Get gas”.';
+    if (st) st.textContent = 'Faucet error: ' + msg;
+  }
+}
+
+
+function resetAll() {
+  if (!confirm('Sign out and erase all local data? This cannot be undone.')) return;
+  localStorage.removeItem('sc2_family_id');
+  /* Don't delete state data — other family members might need it in demo mode */
+  doLogout();
+}
+
+/* ===== INIT ===== */
+window.addEventListener('DOMContentLoaded', function() {
+  initAuth();
+  /* Resume-and-reconcile: when the app returns to the foreground (mobile resumes
+     the webview / re-opens the tab / regains network), pull any write that
+     completed on the network while we were suspended. Cheap when nothing is
+     pending (a localStorage read; no network unless a marker exists). */
+  document.addEventListener('visibilitychange', function(){ if (document.visibilityState === 'visible') { reconcilePending(); drainQueue(); } });
+  window.addEventListener('focus', function(){ reconcilePending(); drainQueue(); });
+  window.addEventListener('online', function(){ reconcilePending(); drainQueue(); });
+  window.addEventListener('pageshow', function(){ reconcilePending(); drainQueue(); });
+  setInterval(function(){ if (document.visibilityState === 'visible') { reconcilePending(); drainQueue(); } }, 20000);
+});
+</script>
+</body>
+</html>
