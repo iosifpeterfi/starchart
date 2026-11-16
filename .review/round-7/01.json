@@ -1,0 +1,34 @@
+{
+  "reviewer": "01",
+  "area": "Enclave backend",
+  "round": 7,
+  "files_reviewed": [
+    "enclave/build/securelock/src/etny_session_exec.py",
+    "enclave/build/securelock/src/etny_exec.py",
+    "enclave/build/securelock/src/ecld_state.py",
+    "enclave/src/serverless/backend.py",
+    "enclave/build/securelock/src/etny_exec_serv.py",
+    "enclave/build/securelock/src/etny_exec_flask.py",
+    "enclave/build/securelock/src/local_api.py",
+    "enclave/.config.json",
+    "enclave/tests/test_backend.py"
+  ],
+  "findings": [
+    {
+      "severity": "HIGH",
+      "title": "Hardcoded ngrok auth token in etny_exec_flask.py",
+      "file": "enclave/build/securelock/src/etny_exec_flask.py",
+      "line": 251,
+      "description": "The ngrok authentication token '2orw7I8y15uYu4ajtlsGwimgAqK_6ke12fFHvBdkWkyYpEyf6' is hardcoded as a default fallback in os.environ.get(). This is a distinct credential from the ESR wallet private key fixed in R1. Although etny_exec_flask.py is not imported by the active code path, the file resides in build/securelock/src/ and will be included in the sealed enclave image. The token is also in git history.",
+      "suggestion": "Remove the hardcoded fallback so the line reads: auth_token = os.environ.get('ETNY_NGROK_AUTHTOKEN', ''). If the token is needed for development, place it in .env.example with a placeholder. Consider rotating the exposed token on the ngrok dashboard."
+    }
+  ],
+  "invariants_checked": [
+    "Every intent is EIP-191 signature-verified before state mutation -- PASS",
+    "Exactly-once esr_nonce prevents duplicate commits -- PASS",
+    "Session handler ___etny_on_input___ never raises -- PASS",
+    "migrate_state uses StateRegistry.fence() not manual state copy -- PASS",
+    "ENCLAVE_CONFIG.enclaveAddress matches v70 ESR wallet -- PASS"
+  ],
+  "invariants_ok": true
+}

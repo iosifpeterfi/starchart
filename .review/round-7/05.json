@@ -1,0 +1,35 @@
+{
+  "reviewer": "05",
+  "area": "Security",
+  "round": 7,
+  "files_reviewed": [
+    "web3/index.html",
+    "web3/src/ethernity_runner.js",
+    "web3/src/auth.js",
+    "web3/build.mjs",
+    "enclave/build/securelock/src/etny_session_exec.py",
+    "enclave/build/securelock/src/etny_exec.py",
+    "enclave/src/serverless/backend.py",
+    "enclave/build/securelock/src/ecld_state.py"
+  ],
+  "findings": [
+    {
+      "severity": "MEDIUM",
+      "title": "Address validation incomplete: execute() member-management path bypasses _VALID_ETH_ADDR",
+      "file": "enclave/src/serverless/backend.py",
+      "line": 291,
+      "description": "The R6 fix added _VALID_ETH_ADDR validation to invite_member(), but execute() bypasses ACTIONS dispatch for invite_member/remove_member and runs its own _commit_transform logic. That path calls _es._norm_addr(intent['wallet']) which only lowercases the string, accepting any non-empty string as a wallet address.",
+      "suggestion": "Add _VALID_ETH_ADDR.match() before _norm_addr in execute()'s member-management branch."
+    }
+  ],
+  "invariants_checked": [
+    "Every intent is EIP-191 signature-verified before state mutation -- PASS",
+    "Session handler ___etny_on_input___ never raises -- PASS",
+    "No new XSS vectors -- PASS",
+    "Exactly-once esr_nonce prevents duplicate commits -- PASS",
+    "enqueueAction applies optimistic local state before queueing -- PASS",
+    "drainQueue falls back to submitTask if session unavailable -- PASS",
+    "Logout closes any active session -- PASS"
+  ],
+  "invariants_ok": true
+}

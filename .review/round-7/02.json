@@ -1,0 +1,23 @@
+{
+  "reviewer": "02",
+  "area": "ESR state",
+  "round": 7,
+  "files_reviewed": [
+    "enclave/build/securelock/src/ecld_state.py",
+    "enclave/build/securelock/src/esr_wallet.py",
+    "enclave/build/securelock/src/esr_local.py",
+    "enclave/src/serverless/backend.py",
+    "enclave/esr_verify.py",
+    "enclave/.config.json",
+    "enclave/tests/test_backend.py",
+    "enclave/test_migrate_v70.py"
+  ],
+  "findings": [],
+  "invariants_checked": [
+    "Exactly-once esr_nonce prevents duplicate commits -- PASS",
+    "migrate_state uses StateRegistry.fence() not manual state copy -- PASS",
+    "Every intent is EIP-191 signature-verified before state mutation -- PASS",
+    "ENCLAVE_CONFIG.enclaveAddress matches v70 ESR wallet -- PASS"
+  ],
+  "invariants_ok": true
+}
