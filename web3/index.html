@@ -966,6 +966,12 @@ async function onSessionReady(session) {
           console.log('Family state loaded' + (r.fromCache ? ' (from cache, 0 orders)' : ' (fresh read)'));
           completeProgress(); await sleep(300); showProgress(false);
           unlockApp();
+          /* Pre-open session in background so chore taps are instant */
+          if (window.EthernityRunner && !window.EthernityRunner.hasActiveSession()) {
+            window.EthernityRunner.startSession().then(function(info) {
+              console.log('[session] pre-opened on login, order', info && info.orderId);
+            }).catch(function(e) { console.warn('[session] pre-open failed:', e.message); });
+          }
         } else {
           /* No v63 family for this id (empty state, or we're not a member): start
              fresh — do NOT fall back to stale local state. */
@@ -1067,6 +1073,12 @@ async function createFamily() {
     await executeIntent('create_family', {});
     localStorage.setItem('sc2_family_id', familyId);
     completeProgress();
+    /* Pre-open the session in the background so chore taps are instant */
+    if (window.EthernityRunner && !window.EthernityRunner.hasActiveSession()) {
+      window.EthernityRunner.startSession().then(function(info) {
+        console.log('[session] pre-opened after create, order', info && info.orderId);
+      }).catch(function(e) { console.warn('[session] pre-open failed:', e.message); });
+    }
     await sleep(350);          /* let the bar visibly reach 100% */
     showProgress(false);
     /* Show the shareable Family ID before entering the app. */
