@@ -288,6 +288,8 @@ def execute(family_id: str, intent_json: str) -> dict:
         # avoids the intra-task double write entirely.
         import ecld_state as _es
         grant = action == "invite_member"
+        if not _VALID_ETH_ADDR.match(str(intent.get("wallet", ""))):
+            raise ValueError(f"Invalid wallet address: {intent.get('wallet')!r}")
         wallet_addr = _es._norm_addr(intent["wallet"])
         if not wallet_addr:
             raise ValueError("a member wallet address is required")

@@ -767,6 +767,24 @@ async function drainQueue(){
           console.log('[session] retrying via one-shot task');
           useSession = false; continue;
         }
+        if (/nonce mismatch/i.test(e && e.message)) {
+          console.warn('drainQueue: app-level nonce mismatch — resyncing state');
+          try {
+            var _nri = await signIntent('read_family', {});
+            var _nrr = await window.EthernityRunner.submitRead(familyId, _nri, function(){});
+            if (_nrr && _nrr.state) {
+              familyState = _nrr.state;
+              if (_nrr.version != null) esrVersion = _nrr.version;
+              if (_nrr.nonce != null) esrNonce = _nrr.nonce;
+              OptimisticCache.setState(familyId, familyState);
+            }
+          } catch(_ne) { console.warn('drainQueue nonce resync read failed:', _ne.message); }
+          job.intentData.nonce = (familyState && familyState.nonce) || 0;
+          job._pinnedNonce = null;
+          job.tries = 0;
+          _saveQueue(); updateSyncUI(); render();
+          continue;
+        }
         if (job.tries < 3){ _saveQueue(); updateSyncUI(); await sleep(4000); }
         else { _queueErr++; _queue.shift(); _saveQueue(); updateSyncUI(); render(); showToast('Action dropped after 3 failures: ' + (job.action || 'unknown')); }
       }
