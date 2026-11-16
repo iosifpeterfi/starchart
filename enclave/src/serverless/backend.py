@@ -380,9 +380,12 @@ def ___etny_on_input___(data):
     intent_json = json.dumps(intent, separators=(",", ":"))
     try:
         if op == "migrate":
+            intent = json.loads(intent_json) if isinstance(intent_json, str) else intent_json
+            signer = recover_signer(intent)
             old_enclave = env.get("old_enclave", "")
             bound = env.get("bound", "0")
             result = migrate_state(family_id, old_enclave, bound)
+            result["signer"] = signer
         elif op == "read":
             result = read_family(family_id, intent_json)
         else:

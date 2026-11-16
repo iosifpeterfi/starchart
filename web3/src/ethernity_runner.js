@@ -75,8 +75,10 @@ function persistWallet(runner) {
 }
 
 function intentToCode(fn, familyId, signedIntent) {
+  if (!/^[0-9a-f]+$/.test(familyId)) throw new Error('Invalid family ID format');
   const intentJson = JSON.stringify(signedIntent, Object.keys(signedIntent).sort());
-  return `ecld_result(${fn}("${familyId}", '${intentJson}'))`;
+  const safe = intentJson.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  return `ecld_result(${fn}("${familyId}", '${safe}'))`;
 }
 
 /* Drive a full run() to completion via events (writes, and read cache-misses). */
@@ -244,9 +246,9 @@ async function sessionRead(familyId, signedIntent) {
 
 async function closeSession() {
   if (!_session) return null;
-  const result = await _session.close();
+  const s = _session;
   _session = null;
-  return result;
+  return s.close();
 }
 
 function hasActiveSession() {

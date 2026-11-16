@@ -13,7 +13,7 @@ await esbuild.build({
   define: {
     'global': 'globalThis',
   },
-  external: ['http', 'https', 'zlib', 'url', 'net', 'tls', 'crypto', 'stream', 'os', 'path', 'fs', 'child_process', 'worker_threads', 'node:fs/promises', 'node:path', 'node:os', 'node:crypto'],
+  external: ['http', 'https', 'zlib', 'url', 'net', 'tls', 'crypto', 'stream', 'os', 'path', 'fs', 'child_process', 'worker_threads', 'node:http', 'node:https', 'node:zlib', 'node:url', 'node:net', 'node:tls', 'node:crypto', 'node:stream', 'node:os', 'node:path', 'node:fs', 'node:fs/promises', 'node:child_process', 'node:worker_threads'],
   logLevel: 'info',
 });
 

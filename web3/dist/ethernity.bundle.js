@@ -128719,8 +128719,10 @@ ${message.length}`, "utf-8");
     if (w) localStorage.setItem(WALLET_LS_KEY, w);
   }
   function intentToCode(fn, familyId, signedIntent) {
+    if (!/^[0-9a-f]+$/.test(familyId)) throw new Error("Invalid family ID format");
     const intentJson = JSON.stringify(signedIntent, Object.keys(signedIntent).sort());
-    return `ecld_result(${fn}("${familyId}", '${intentJson}'))`;
+    const safe = intentJson.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+    return `ecld_result(${fn}("${familyId}", '${safe}'))`;
   }
   function runToCompletion(runner, code14, onProgress) {
     const listeners = [];
@@ -128858,9 +128860,9 @@ ${message.length}`, "utf-8");
   }
   async function closeSession() {
     if (!_session) return null;
-    const result2 = await _session.close();
+    const s = _session;
     _session = null;
-    return result2;
+    return s.close();
   }
   function hasActiveSession() {
     return _session !== null && !_session.closed;
