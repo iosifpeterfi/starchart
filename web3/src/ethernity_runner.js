@@ -51,13 +51,30 @@ function getRunner() {
   if (!key) throw new Error('No Bloxberg private key available. Please sign in first.');
   if (!_runner || _runnerKey !== key) {
     _runner = new EthernityCloudRunner(ECAddress.BLOXBERG.TESTNET_ADDRESS, { privateKey: key });
-    _runner.enableStateCache(); // localStorage-backed in the browser
+    _runner.enableStateCache();
     _runnerKey = key;
-    const w = enclaveAddress(); // learned address (localStorage) or the config seed for v63
+    const w = enclaveAddress();
     if (w) {
       _runner._esrWalletMemo = _runner._esrWalletMemo || {};
       _runner._esrWalletMemo[ENCLAVE_CONFIG.secureLockEnclave] = w;
     }
+    // PoX 1.2 on bloxberg requires tETNY approval — the JS runner skips it
+    // for bloxberg (family !== 'ecld'), so we patch checkAllowance.
+    const origCheck = _runner.checkAllowance.bind(_runner);
+    _runner.checkAllowance = async function(taskPrice) {
+      await origCheck(taskPrice);
+      try {
+        await this.resolveNetworkContext();
+        const ok = await this.tokenContract.checkAndSetAllowance(
+          this.protocolContract.contractAddress(),
+          '100',
+          taskPrice.toString()
+        );
+        if (!ok) console.warn('tETNY allowance check returned false');
+      } catch (e) {
+        console.warn('tETNY allowance check failed (may already be set):', e.message);
+      }
+    };
   }
   return _runner;
 }
