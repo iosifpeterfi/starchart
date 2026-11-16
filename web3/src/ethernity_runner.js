@@ -20,13 +20,6 @@ if (typeof globalThis.Buffer === 'undefined') globalThis.Buffer = BufferPolyfill
  */
 import EthernityCloudRunner from '@ethernity-cloud/runner/runner.js';
 import { ECAddress, ECStatus } from '@ethernity-cloud/runner/enums.js';
-import { ethers } from 'ethers';
-
-const TETNY_TOKEN = '0x02882F03097fE8cD31afbdFbB5D72a498B41112c';
-const POX_1_2 = '0x7E7C6eB435E3687CfDfe18C09C0340eb70567d7b';
-const APPROVE_ABI = ['function approve(address spender, uint256 amount) returns (bool)', 'function allowance(address owner, address spender) view returns (uint256)'];
-const POX_1_2_ABI_FRAGMENT = ['function _addDORequest(uint8,uint8,uint8,uint8,uint8,uint8,uint256,string,string,string,string) returns (uint256)', 'function _getOrder(uint256) view returns (tuple)', 'function _approveOrder(uint256)', 'function _cancelDORequest(uint256)', 'function _getResultFromOrder(uint256) view returns (tuple)', 'function _getDORequest(uint256) view returns (tuple)', 'function _getDORequestMetadata(uint256) view returns (tuple)', 'function _getMyDPRequests() view returns (uint256[])', 'event _addDORequestEV(address,uint256)'];
-let _approved = false;
 
 const ENCLAVE_CONFIG = {
   secureLockEnclave: 'starchart_enclave',
@@ -68,60 +61,10 @@ function getRunner() {
       _runner._esrWalletMemo = _runner._esrWalletMemo || {};
       _runner._esrWalletMemo[ENCLAVE_CONFIG.secureLockEnclave] = w;
     }
-    // PoX 1.2 override: the JS runner 0.6.27 still points at the old bloxberg
-    // contract. Rewire the protocol contract to PoX 1.2 until the runner is fixed.
-    const pc = _runner.protocolContract;
-    if (pc && pc.etnyContract) {
-      const pox12 = new ethers.Contract(POX_1_2, pc.etnyContract.interface, pc.signer);
-      const pox12Provider = new ethers.Contract(POX_1_2, pc.etnyContract.interface, pc.provider);
-      pc.etnyContract = pox12;
-      pc.etnyContactWithProvider = pox12Provider;
-      pc.contractAddress = () => POX_1_2;
-    }
   }
   return _runner;
 }
 
-let _approvePromise = null;
-
-async function ensureAllowance() {
-  if (_approved) return;
-  if (_approvePromise) return _approvePromise;
-  const key = window._bloxbergPrivateKey;
-  if (!key) return;
-  _approvePromise = _doApprove(key);
-  try { await _approvePromise; } finally { _approvePromise = null; }
-}
-
-async function _doApprove(key) {
-  try {
-    const provider = new ethers.providers.StaticJsonRpcProvider('https://bloxberg.ethernity.cloud', { chainId: 8995, name: 'bloxberg' });
-    const wallet = new ethers.Wallet(key, provider);
-    const iface = new ethers.utils.Interface(APPROVE_ABI);
-
-    // Check current allowance
-    const allowanceData = iface.encodeFunctionData('allowance', [wallet.address, POX_1_2]);
-    const rawAllowance = await provider.call({ to: TETNY_TOKEN, data: allowanceData });
-    const current = ethers.BigNumber.from(rawAllowance);
-    console.log('[starchart] tETNY allowance:', ethers.utils.formatEther(current));
-
-    if (current.gte(ethers.utils.parseEther('10'))) {
-      _approved = true;
-      return;
-    }
-
-    // Send approve tx
-    console.log('[starchart] sending tETNY approve for PoX 1.2...');
-    const approveData = iface.encodeFunctionData('approve', [POX_1_2, ethers.constants.MaxUint256]);
-    const tx = await wallet.sendTransaction({ to: TETNY_TOKEN, data: approveData, gasLimit: 60000 });
-    console.log('[starchart] approve tx:', tx.hash);
-    const receipt = await tx.wait();
-    console.log('[starchart] approve confirmed, status:', receipt.status);
-    _approved = (receipt.status === 1);
-  } catch (e) {
-    console.error('[starchart] tETNY approval error:', e);
-  }
-}
 
 function enclaveAddress() {
   // Prefer the address learned from a live result envelope (survives rebuilds via
@@ -188,7 +131,7 @@ function runToCompletion(runner, code, onProgress) {
  * Returns the enclave's execute() result { status, state, version, nonce, ... }.
  */
 async function submitTask(familyId, signedIntent, onProgress) {
-  await ensureAllowance();
+
   const runner = getRunner();
   const result = await runToCompletion(runner, intentToCode('execute', familyId, signedIntent), onProgress);
   if (result && result.version != null) _lastVersion[familyId] = result.version;
@@ -275,7 +218,7 @@ async function waitForVersion(familyId, sinceVersion, timeoutMs) {
 let _session = null;
 
 async function startSession(onProgress) {
-  await ensureAllowance();
+
   if (_session && !_session.closed) {
     try {
       await Promise.race([
