@@ -121589,6 +121589,21 @@ ${message.length}`, "utf-8");
       await delay(pollMs);
     }
   };
+  var READ_ATTEMPTS = 3;
+  var READ_RETRY_MS = 2e3;
+  var retryRead = async (read12, { attempts = READ_ATTEMPTS, delayMs = READ_RETRY_MS, onError = () => {
+  } } = {}) => {
+    for (let attempt = 1; ; attempt += 1) {
+      try {
+        return await read12();
+      } catch (error) {
+        if (attempt >= attempts) throw error;
+        onError(error, attempt);
+      }
+      await delay(delayMs);
+    }
+  };
+  var providerMessage = (error) => error?.info?.error?.data?.message ?? error?.info?.error?.message ?? error?.shortMessage ?? error?.message ?? String(error);
   var LOG_RANGE_BLOCKS = 3e3;
   var queryFilterChunked = async (contract5, filter2, fromBlock, toBlock) => {
     const logs = [];
@@ -121916,6 +121931,7 @@ ${message.length}`, "utf-8");
   var ECNetworkConfig = {
     [ECAddress.BLOXBERG.TESTNET_ADDRESS]: {
       family: "bloxberg",
+      tokenName: "tETNY",
       protocolAddress: ECAddress.BLOXBERG.TESTNET_PROTOCOL_ADDRESS,
       imageRegistry: {
         PYNITHY: ECAddress.BLOXBERG.IMAGE_REGISTRY.PYNITHY.TESTNET_ADDRESS,
@@ -121928,6 +121944,7 @@ ${message.length}`, "utf-8");
     },
     [ECAddress.BLOXBERG.MAINNET_ADDRESS]: {
       family: "bloxberg",
+      tokenName: "ETNY",
       protocolAddress: ECAddress.BLOXBERG.MAINNET_ADDRESS,
       imageRegistry: {
         PYNITHY: ECAddress.BLOXBERG.IMAGE_REGISTRY.PYNITHY.MAINNET_ADDRESS,
@@ -121939,6 +121956,7 @@ ${message.length}`, "utf-8");
     },
     [ECAddress.POLYGON.MAINNET_ADDRESS]: {
       family: "ecld",
+      tokenName: "ECLD",
       protocolAddress: ECAddress.POLYGON.MAINNET_PROTOCOL_ADDRESS,
       imageRegistry: {
         PYNITHY: ECAddress.POLYGON.IMAGE_REGISTRY.PYNITHY.MAINNET_ADDRESS,
@@ -121950,6 +121968,7 @@ ${message.length}`, "utf-8");
     },
     [ECAddress.POLYGON.TESTNET_ADDRESS]: {
       family: "ecld",
+      tokenName: "tECLD",
       protocolAddress: ECAddress.POLYGON.TESTNET_PROTOCOL_ADDRESS,
       imageRegistry: {
         PYNITHY: ECAddress.POLYGON.IMAGE_REGISTRY.PYNITHY.TESTNET_ADDRESS,
@@ -121964,6 +121983,7 @@ ${message.length}`, "utf-8");
   var ECEcldTestnetConfig = {
     4690: {
       family: "ecld",
+      tokenName: "tECLD",
       protocolAddress: ECAddress.IOTEX.TESTNET_PROTOCOL_ADDRESS,
       imageRegistry: {
         PYNITHY: ECAddress.IOTEX.IMAGE_REGISTRY.PYNITHY.TESTNET_ADDRESS,
@@ -121975,6 +121995,7 @@ ${message.length}`, "utf-8");
     },
     11155111: {
       family: "ecld",
+      tokenName: "tECLD",
       protocolAddress: ECAddress.SEPOLIA.TESTNET_PROTOCOL_ADDRESS,
       imageRegistry: {
         PYNITHY: ECAddress.SEPOLIA.IMAGE_REGISTRY.PYNITHY.TESTNET_ADDRESS,
@@ -121987,6 +122008,7 @@ ${message.length}`, "utf-8");
     },
     4441: {
       family: "ecld",
+      tokenName: "tECLD",
       protocolAddress: ECAddress.LITVM.TESTNET_PROTOCOL_ADDRESS,
       imageRegistry: {
         PYNITHY: ECAddress.LITVM.IMAGE_REGISTRY.PYNITHY.TESTNET_ADDRESS,
@@ -122001,6 +122023,7 @@ ${message.length}`, "utf-8");
   var ECLD_SHARED_TESTNET_TOKEN = ECAddress.IOTEX.TESTNET_ADDRESS;
   var ECLD_PROVISIONAL_CONFIG = {
     family: "ecld",
+    tokenName: "tECLD",
     protocolAddress: void 0,
     imageRegistry: { PYNITHY: void 0, NODENITHY: void 0 },
     isMainnet: false,
@@ -124378,7 +124401,17 @@ ${message.length}`, "utf-8");
   }) {
     const required = ethers_exports.parseUnits(tokens, "ether");
     const wallet = await signer.getAddress();
-    const allowance = await token.allowance(wallet, protocolAddress);
+    let allowance;
+    try {
+      allowance = await retryRead(() => token.allowance(wallet, protocolAddress), {
+        onError: (error, attempt) => report(`Allowance read failed (try ${attempt} of ${READ_ATTEMPTS}), retrying: ${providerMessage(error)}`)
+      });
+    } catch (error) {
+      throw new Error(
+        `could not read the allowance of ${wallet} for ${protocolAddress} at ${token.target}: ${providerMessage(error)}`,
+        { cause: error }
+      );
+    }
     report(`Allowance for ${protocolAddress}: ${ethers_exports.formatEther(allowance)} tokens, ${tokens} required`);
     if (allowance < required) {
       report(`Approving allowance for ${tokens} tokens`);
@@ -124394,19 +124427,37 @@ ${message.length}`, "utf-8");
     return true;
   }
 
+  // node_modules/@ethernity-cloud/runner/contract/operation/tokenBalance.js
+  async function readTokenBalance(token, wallet, tokenName) {
+    let balance;
+    try {
+      balance = await token.balanceOf(wallet);
+    } catch (error) {
+      throw new Error(
+        `could not read the ${tokenName} balance of ${wallet} at ${token.target}: ${providerMessage(error)}`,
+        { cause: error }
+      );
+    }
+    return ethers_exports.formatEther(balance);
+  }
+
   // node_modules/@ethernity-cloud/runner/contract/operation/etnyContract.js
   var EtnyContract = class {
-    constructor(networkAddress, walletContext = null) {
+    constructor(networkAddress, walletContext = null, tokenName = "token") {
       __publicField(this, "etnyContract", null);
       __publicField(this, "etnyContactWithProvider", null);
       __publicField(this, "provider", null);
       __publicField(this, "signer", null);
       __publicField(this, "currentWallet", null);
+      // The token's name in the messages of this instance: the network
+      // descriptor's tokenName (tETNY, ETNY), 'token' when built without one.
+      __publicField(this, "tokenName", "token");
       // The address of the token contract this instance is bound to.
       __publicField(this, "contractAddress", () => this.etnyContract.target);
       ({ provider: this.provider, signer: this.signer } = contractRunners(walletContext));
       this.etnyContract = new ethers_exports.Contract(networkAddress || etnyAbi_default.address, etnyAbi_default.abi, this.signer);
       this.etnyContactWithProvider = new ethers_exports.Contract(networkAddress || etnyAbi_default.address, etnyAbi_default.abi, this.provider);
+      this.tokenName = tokenName;
     }
     async initialize() {
       this.currentWallet = await this._getCurrentWallet();
@@ -124431,15 +124482,11 @@ ${message.length}`, "utf-8");
         return null;
       }
     }
-    async getBalance() {
-      try {
-        const address = await this.signer.getAddress();
-        const balance = await this.etnyContract.balanceOf(address);
-        return ethers_exports.formatEther(balance);
-      } catch (ex) {
-        console.log(ex);
-        return 0;
-      }
+    // The balance of `wallet`, the signer's address when not given, on the
+    // token, in tokens (tokenBalance.readTokenBalance): a read the provider
+    // fails throws the error naming the cause.
+    async getBalance(wallet = null) {
+      return readTokenBalance(this.etnyContract, wallet ?? await this.signer.getAddress(), this.tokenName);
     }
     // The wallet's allowance for the PoX at `protocolAddress` on the token,
     // raised to `escrow` tokens when it is below it, by the one implementation
@@ -124819,17 +124866,21 @@ ${message.length}`, "utf-8");
 
   // node_modules/@ethernity-cloud/runner/contract/operation/ecldContract.js
   var EcldContract = class {
-    constructor(networkAddress, walletContext = null) {
+    constructor(networkAddress, walletContext = null, tokenName = "token") {
       __publicField(this, "ecldContract", null);
       __publicField(this, "ecldContactWithProvider", null);
       __publicField(this, "provider", null);
       __publicField(this, "signer", null);
       __publicField(this, "currentWallet", null);
+      // The token's name in the messages of this instance: the network
+      // descriptor's tokenName (ECLD, tECLD), 'token' when built without one.
+      __publicField(this, "tokenName", "token");
       // The address of the token contract this instance is bound to.
       __publicField(this, "contractAddress", () => this.ecldContract.target);
       ({ provider: this.provider, signer: this.signer } = contractRunners(walletContext));
       this.ecldContract = new ethers_exports.Contract(networkAddress || ecldAbi_default.address, ecldAbi_default.abi, this.signer);
       this.ecldContactWithProvider = new ethers_exports.Contract(networkAddress || ecldAbi_default.address, ecldAbi_default.abi, this.provider);
+      this.tokenName = tokenName;
     }
     async initialize() {
       this.currentWallet = await this._getCurrentWallet();
@@ -124871,15 +124922,11 @@ ${message.length}`, "utf-8");
       const address = await this.signer.getAddress();
       return this.ecldContract.approve(address, allowanceAmount);
     }
-    async getBalance() {
-      try {
-        const address = await this.signer.getAddress();
-        const balance = await this.ecldContract.balanceOf(address);
-        return ethers_exports.formatEther(balance);
-      } catch (ex) {
-        console.log(ex);
-        return 0;
-      }
+    // The balance of `wallet`, the signer's address when not given, on the
+    // token, in tokens (tokenBalance.readTokenBalance): a read the provider
+    // fails throws the error naming the cause.
+    async getBalance(wallet = null) {
+      return readTokenBalance(this.ecldContract, wallet ?? await this.signer.getAddress(), this.tokenName);
     }
     async signMessage(message) {
       const signer = this.getSigner();
@@ -127745,7 +127792,7 @@ ${message.length}`, "utf-8");
         throw new Error("Invalid network address");
       }
       this.networkConfig = cfg;
-      this.tokenContract = cfg.family === "bloxberg" ? new etnyContract_default(this.networkAddress, wc) : new ecldContract_default(this.networkAddress, wc);
+      this.tokenContract = cfg.family === "bloxberg" ? new etnyContract_default(this.networkAddress, wc, cfg.tokenName) : new ecldContract_default(this.networkAddress, wc, cfg.tokenName);
       if (cfg.protocolAddress) {
         this.initializeProtocolContract(cfg);
       }
@@ -127858,10 +127905,20 @@ ${message.length}`, "utf-8");
     // The wallet's token balance against the request's escrow: a V2 request's
     // escrowWei, or a legacy request's taskPrice x validators x duration tokens
     // (requestEscrow), the amount the PoX pulls or requires the balance to
-    // cover.
+    // cover. The wallet's address is resolved once, before the read: a browser
+    // wallet whose account is not connected yet is asked for it here, and a
+    // refused request is thrown as it is, asked no second time. The balance is
+    // then read up to READ_ATTEMPTS times (utils.retryRead), each failed try a
+    // WARNING event; when every try fails the last try's error, which names
+    // the token, the wallet and the provider's message
+    // (tokenBalance.readTokenBalance), is thrown as it is: a wallet whose
+    // balance cannot be read is never reported as empty.
     async checkWalletBalance() {
       this.dispatchECEvent("Checking wallet balance....");
-      const balance = await this.tokenContract.getBalance();
+      const wallet = await this.tokenContract.getSigner().getAddress();
+      const balance = await retryRead(() => this.tokenContract.getBalance(wallet), {
+        onError: (error, attempt) => this.dispatchECEvent(`Wallet balance read failed (try ${attempt} of ${READ_ATTEMPTS}), retrying: ${error.message}`, ECLog.WARNING)
+      });
       if (this.v2Terms) {
         if (ethers_exports.parseEther(String(balance)) < this.v2Terms.escrowWei) {
           throw new Error(`Insufficient wallet balance (${balance} tokens for an escrow of ${ethers_exports.formatEther(this.v2Terms.escrowWei)})`);
