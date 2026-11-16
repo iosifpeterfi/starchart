@@ -688,8 +688,9 @@ function enqueueAction(action, intentData){
   /* optimistic mutation — mirrors the enclave's own action_fn */
   familyState = OptimisticCache.execute(familyId, action, Object.assign({ action: action }, intentData), userWallet.address);
   render();
-  if (!window.EthernityRunner) { showToast('Offline — change saved locally, will sync when connected'); return; }
+  if (!window.EthernityRunner) { showToast('Offline — change saved locally, will sync when connected'); }
   _queue.push({ action: action, intentData: intentData, tries: 0 });
+  if (!window.EthernityRunner) { _saveQueue(); updateSyncUI(); return; }
   _saveQueue();
   updateSyncUI();
   drainQueue();
@@ -768,7 +769,14 @@ async function drainQueue(){
           useSession = false; continue;
         }
         if (/nonce mismatch/i.test(e && e.message)) {
-          console.warn('drainQueue: app-level nonce mismatch — resyncing state');
+          job._nonceRetries = (job._nonceRetries || 0) + 1;
+          if (job._nonceRetries > 5) {
+            _queueErr++; _queue.shift(); _saveQueue(); updateSyncUI(); render();
+            showToast('Action dropped after 5 nonce-mismatch retries: ' + (job.action || 'unknown'));
+            continue;
+          }
+          console.warn('drainQueue: app-level nonce mismatch (retry ' + job._nonceRetries + '/5) — resyncing state');
+          await sleep(1000 * Math.pow(2, job._nonceRetries - 1));
           try {
             var _nri = await signIntent('read_family', {});
             var _nrr = await window.EthernityRunner.submitRead(familyId, _nri, function(){});
@@ -1019,9 +1027,9 @@ function doLogin() { doLoginWeb3Auth(); }
 async function doLogout() {
   stopFundPolling();
   if (_queue.length && !confirm('You have ' + _queue.length + ' unsent change(s). Logging out will discard them. Continue?')) return;
-  if (_queueRunning) {
+  if (_queueRunning || _activeWrite) {
     showToast('Waiting for current sync to finish…');
-    await new Promise(function(r) { var c = setInterval(function() { if (!_queueRunning) { clearInterval(c); r(); } }, 200); });
+    await new Promise(function(r) { var c = setInterval(function() { if (!_queueRunning && !_activeWrite) { clearInterval(c); r(); } }, 200); });
   }
   try { if (window.EthernityRunner && window.EthernityRunner.hasActiveSession()) await window.EthernityRunner.closeSession(); } catch(e){ console.warn('session close on logout:', e.message); }
   _queue = []; _saveQueue(); _queueRunning = false; _activeWrite = false; _queueErr = 0;

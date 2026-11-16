@@ -369,6 +369,13 @@ def read_family(family_id: str, intent_json: str) -> dict:
     from ecld_state import StateRegistry
 
     intent = json.loads(intent_json)
+
+    if not intent.get("family_id"):
+        raise ValueError("Intent must include family_id for cross-family replay protection")
+    if intent["family_id"] != family_id:
+        raise ValueError(
+            f"Intent bound to family {intent['family_id']} but submitted to {family_id}")
+
     signer = recover_signer(intent)
 
     state = StateRegistry()
@@ -443,6 +450,11 @@ def ___etny_on_input___(data):
         intent_json = json.dumps(intent, separators=(",", ":"))
         if op == "migrate":
             intent = json.loads(intent_json) if isinstance(intent_json, str) else intent_json
+            if not intent.get("family_id"):
+                raise ValueError("Intent must include family_id for cross-family replay protection")
+            if intent["family_id"] != family_id:
+                raise ValueError(
+                    f"Intent bound to family {intent['family_id']} but submitted to {family_id}")
             signer = recover_signer(intent)
             from ecld_state import StateRegistry, _task_caller
             _pre = StateRegistry().get(family_id)

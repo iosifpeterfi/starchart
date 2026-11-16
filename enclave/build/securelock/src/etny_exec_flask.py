@@ -17,6 +17,12 @@ from pyngrok import ngrok
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 import importlib
 
+try:
+    from RestrictedPython import compile_restricted, safe_builtins
+except ImportError:
+    compile_restricted = None
+    safe_builtins = None
+
 # ===========================
 # Backend Functions Loading
 # ===========================
@@ -38,6 +44,7 @@ if backend is not None:
             sdkFunctions.update({func: backend.__dict__[func]})
 
 server_instance = None
+server_lock = threading.Lock()
 
 # ===========================
 # Flask and ngrok Setup
@@ -491,7 +498,6 @@ def execute_server_v4(payload_data, input_data=None, globals=None, locals=None):
         dict: Information about the server setup.
     """
     global server_instance
-    server_lock = threading.Lock()
     with server_lock:
         print("SL")
         if server_instance is None:
