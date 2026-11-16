@@ -837,8 +837,10 @@ async function drainQueue(){
       }
     }
   } finally {
-    if (_drainWatchdog) { clearTimeout(_drainWatchdog); _drainWatchdog = null; }
-    _queueRunning = false; _activeWrite = false; updateSyncUI();
+    if (_drainGeneration === myGen) {
+      if (_drainWatchdog) { clearTimeout(_drainWatchdog); _drainWatchdog = null; }
+      _queueRunning = false; _activeWrite = false; updateSyncUI();
+    }
   }
 }
 
