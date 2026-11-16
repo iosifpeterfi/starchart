@@ -764,8 +764,8 @@ async function drainQueue(){
       } catch(e){
         job.tries = (job.tries || 0) + 1;
         console.warn('queued commit failed (try ' + job.tries + '):', e && e.message);
-        if (useSession && job.tries === 1) {
-          console.log('[session] retrying via one-shot task');
+        if (useSession && job.tries === 1 && !/nonce mismatch|invalid|permission|family/i.test(e && e.message)) {
+          console.log('[session] transport error — retrying via one-shot task');
           useSession = false; continue;
         }
         if (/nonce mismatch/i.test(e && e.message)) {
@@ -1034,6 +1034,7 @@ async function doLogout() {
   try { if (window.EthernityRunner && window.EthernityRunner.hasActiveSession()) await window.EthernityRunner.closeSession(); } catch(e){ console.warn('session close on logout:', e.message); }
   _queue = []; _saveQueue(); _queueRunning = false; _activeWrite = false; _queueErr = 0;
   esrVersion = 0; esrNonce = 0;
+  _lastBal = null; _lastGas = null;
   window._bloxbergPrivateKey = null;
   window._lastSession = null;
   if (window.EthernityRunner && window.EthernityRunner.resetRunner) window.EthernityRunner.resetRunner();
@@ -1345,7 +1346,6 @@ async function tap(id) {
       enqueueAction('complete_chore', { date: d, chore_id: id });
       if (!task.mandatory) confetti();
     }
-    render();
     var el = document.getElementById('card-' + id);
     if (el) { el.classList.remove('bounce'); void el.offsetWidth; el.classList.add('bounce'); }
   } catch(e) {
@@ -1420,7 +1420,6 @@ async function addTask() {
   try {
     enqueueAction('add_task', { task: task });
     closeOverlay('addTaskOverlay');
-    render();
     showToast('Task added!');
   } catch(e) {
     showToast('Error: ' + (e.message || 'Failed'));
@@ -1486,7 +1485,6 @@ async function cashOut() {
   try {
     enqueueAction('withdraw', { points: b, euros: parseFloat((b / 10).toFixed(2)), date: today() });
     confetti();
-    render();
     showToast('\uD83D\uDCB0 Cashed out \u20AC' + (b / 10).toFixed(2) + '!');
     openMoney();
   } catch(e) {
@@ -1534,7 +1532,6 @@ function showAdminPanel() {
 async function deleteTask(id) {
   try {
     enqueueAction('remove_task', { task_id: id });
-    render();
     showAdminPanel();
     showToast('Task deleted!');
   } catch(e) {
@@ -1890,8 +1887,8 @@ async function fundFaucetDrip(){
 
 function resetAll() {
   if (!confirm('Sign out and erase all local data? This cannot be undone.')) return;
+  _queue = []; _saveQueue();
   localStorage.removeItem('sc2_family_id');
-  /* Don't delete state data — other family members might need it in demo mode */
   doLogout();
 }
 

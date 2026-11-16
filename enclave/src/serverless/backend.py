@@ -163,19 +163,19 @@ def remove_task(state: dict, intent: dict, signer: str) -> dict:
     return state
 
 
-def _earned_points(state: dict) -> float:
-    """Sum of all earned points from completed optional chores."""
-    total = 0.0
+def _earned_points(state: dict) -> int:
+    """Sum of all earned points from completed chores (integer centpoints to avoid float drift)."""
+    total = 0
     task_map = {t["id"]: t for t in state.get("tasks", [])}
     for date_chores in state.get("days", {}).values():
         for chore_id, done in date_chores.items():
             if done and chore_id in task_map:
-                total += task_map[chore_id].get("points", 0)
+                total += int(round(task_map[chore_id].get("points", 0) * 100))
     return total
 
 
-def _withdrawn_points(state: dict) -> float:
-    return sum(w.get("points", 0) for w in state.get("withdrawals", []))
+def _withdrawn_points(state: dict) -> int:
+    return sum(int(round(w.get("points", 0) * 100)) for w in state.get("withdrawals", []))
 
 
 def withdraw(state: dict, intent: dict, signer: str) -> dict:
@@ -189,9 +189,10 @@ def withdraw(state: dict, intent: dict, signer: str) -> dict:
         raise ValueError(f"Invalid points value: {points!r}")
     if not isinstance(euros, (int, float)) or euros < 0:
         raise ValueError(f"Invalid euros value: {euros!r}")
-    available = _earned_points(state) - _withdrawn_points(state)
-    if points > available:
-        raise ValueError(f"Insufficient balance: requested {points}, available {available}")
+    available_cp = _earned_points(state) - _withdrawn_points(state)
+    requested_cp = int(round(points * 100))
+    if requested_cp > available_cp:
+        raise ValueError(f"Insufficient balance: requested {points}, available {available_cp / 100}")
     state.setdefault("withdrawals", []).append({
         "points": points,
         "euros": euros,
@@ -272,8 +273,8 @@ def execute(family_id: str, intent_json: str) -> dict:
 
     state = StateRegistry()
     esr_nonce = intent.get("esr_nonce")
-    if action == "withdraw" and esr_nonce is None:
-        raise ValueError("withdraw requires esr_nonce for exactly-once protection")
+    if action in ("withdraw", "invite_member", "remove_member") and esr_nonce is None:
+        raise ValueError(f"{action} requires esr_nonce for exactly-once protection")
 
     if action in ("invite_member", "remove_member"):
         # Member management changes BOTH the family's data (the members list)

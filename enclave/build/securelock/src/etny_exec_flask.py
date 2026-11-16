@@ -241,7 +241,8 @@ class EthernityEnclaveServer:
             """
             Lists all loaded backend functions.
             """
-            functions = {name: func.__doc__ for name, func in self.globals_context.context.items() if callable(func)}
+            with self.globals_context.lock:
+                    functions = {name: func.__doc__ for name, func in self.globals_context.context.items() if callable(func)}
             return jsonify({"status": "success", "functions": functions}), 200
 
     def run_flask(self):
@@ -424,11 +425,7 @@ class EthernityEnclaveServer:
             }, locals_ctx)
             print("res:", result)
 
-            excluded_vars = {'___etny_data_set___', '___etny_result___'}
-
-            outputs.append(result)
-
-            return {"status": "success", "outputs": outputs}
+            return {"status": "success", "outputs": [result]}
         except Exception as e:
             return {"status": "error", "message": str(e)}
 
