@@ -73,19 +73,23 @@ async function ensureAllowance() {
   const key = window._bloxbergPrivateKey;
   if (!key) return;
   try {
-    const provider = new ethers.providers.JsonRpcProvider('https://bloxberg.ethernity.cloud');
-    const signer = new ethers.Wallet(key, provider);
+    const runner = getRunner();
+    await runner.resolveNetworkContext();
+    const signer = runner.protocolContract.getSigner();
     const token = new ethers.Contract(TETNY_TOKEN, APPROVE_ABI, signer);
-    const current = await token.allowance(signer.address, POX_1_2);
+    const address = await signer.getAddress();
+    const current = await token.allowance(address, POX_1_2);
+    console.log('[starchart] current tETNY allowance:', current.toString());
     if (current.lt(ethers.utils.parseEther('10'))) {
       console.log('[starchart] approving tETNY for PoX 1.2...');
       const tx = await token.approve(POX_1_2, ethers.constants.MaxUint256);
+      console.log('[starchart] approve tx:', tx.hash);
       await tx.wait();
       console.log('[starchart] tETNY approved for PoX 1.2');
     }
     _approved = true;
   } catch (e) {
-    console.warn('[starchart] tETNY approval failed:', e.message);
+    console.warn('[starchart] tETNY approval failed:', e.message, e);
   }
 }
 
