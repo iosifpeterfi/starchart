@@ -128864,6 +128864,11 @@ ${message.length}`, "utf-8");
     _session = null;
     return s.close();
   }
+  function resetRunner() {
+    _runner = null;
+    _runnerKey = null;
+    _session = null;
+  }
   function hasActiveSession() {
     return _session !== null && !_session.closed;
   }
@@ -128879,6 +128884,7 @@ ${message.length}`, "utf-8");
     sessionRead,
     closeSession,
     hasActiveSession,
+    resetRunner,
     ENCLAVE_CONFIG
   };
 })();

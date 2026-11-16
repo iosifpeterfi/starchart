@@ -957,6 +957,8 @@ function doLogin() { doLoginWeb3Auth(); }
 async function doLogout() {
   try { if (window.EthernityRunner && window.EthernityRunner.hasActiveSession()) await window.EthernityRunner.closeSession(); } catch(e){ console.warn('session close on logout:', e.message); }
   window._bloxbergPrivateKey = null;
+  window._lastSession = null;
+  if (window.EthernityRunner && window.EthernityRunner.resetRunner) window.EthernityRunner.resetRunner();
   await StarChartAuth.logout();
   userWallet = null;
   userInfo = null;

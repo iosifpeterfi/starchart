@@ -251,6 +251,12 @@ async function closeSession() {
   return s.close();
 }
 
+function resetRunner() {
+  _runner = null;
+  _runnerKey = null;
+  _session = null;
+}
+
 function hasActiveSession() {
   return _session !== null && !_session.closed;
 }
@@ -268,5 +274,6 @@ window.EthernityRunner = {
   sessionRead,
   closeSession,
   hasActiveSession,
+  resetRunner,
   ENCLAVE_CONFIG,
 };

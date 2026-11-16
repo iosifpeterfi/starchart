@@ -382,6 +382,10 @@ def ___etny_on_input___(data):
         if op == "migrate":
             intent = json.loads(intent_json) if isinstance(intent_json, str) else intent_json
             signer = recover_signer(intent)
+            from ecld_state import StateRegistry
+            _pre = StateRegistry().get(family_id)
+            if _pre:
+                validate_owner(_pre, signer)
             old_enclave = env.get("old_enclave", "")
             bound = env.get("bound", "0")
             result = migrate_state(family_id, old_enclave, bound)
@@ -425,6 +429,12 @@ def migrate_state(family_id: str, old_enclave: str, bound: str) -> dict:
 
     state = StateRegistry()
     bound_int = int(bound)
+    try:
+        head = int(state._contract().w3.eth.block_number)
+        if bound_int > head:
+            bound_int = head
+    except Exception:
+        pass
 
     ledger = state.fence(bound_int)
 
