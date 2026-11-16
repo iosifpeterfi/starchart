@@ -699,6 +699,7 @@ function enqueueAction(action, intentData){
 
 var SESSION_LS_KEY = 'sc2_session_order';
 var _drainWatchdog = null;
+var _drainGeneration = 0;
 
 async function ensureSession(){
   if (window.EthernityRunner.hasActiveSession()) return true;
@@ -736,10 +737,10 @@ async function drainQueue(){
   }
   console.log('[drain] starting, queue length:', _queue.length);
   _queueRunning = true; _activeWrite = true; updateSyncUI();
-  /* T4: watchdog — force-reset if no progress in 5 minutes */
+  var myGen = ++_drainGeneration;
   if (_drainWatchdog) clearTimeout(_drainWatchdog);
   _drainWatchdog = setTimeout(function() {
-    if (_queueRunning) {
+    if (_queueRunning && _drainGeneration === myGen) {
       console.warn('[drain] watchdog: stuck for 5 min — force-resetting');
       _queueRunning = false; _activeWrite = false; updateSyncUI();
     }
@@ -747,6 +748,7 @@ async function drainQueue(){
   try {
     var useSession = await ensureSession();
     while (_queue.length){
+      if (_drainGeneration !== myGen) { console.warn('[drain] superseded by newer drain — exiting'); break; }
       var job = _queue[0];
       try {
         /* Pin nonce ONCE per job — reuse across retries so the enclave's
