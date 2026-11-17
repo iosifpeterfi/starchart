@@ -721,11 +721,13 @@ async function ensureSession(){
     setSyncDot('yellow spin');
     showToast('Opening secure session…');
     console.log('[session] opening interactive session...');
+    var _sessionDots = setInterval(function() { console.log('[session] waiting for node...'); }, 10000);
     var info = await window.EthernityRunner.startSession(function(p) {
       var msg = p && p.message ? p.message : String(p);
       console.log('[session]', msg);
       showToast(msg.length > 50 ? msg.slice(0, 47) + '…' : msg);
     });
+    clearInterval(_sessionDots);
     showToast('Session ready');
     console.log('[session] opened, order', info.orderId);
     if (info.orderId) localStorage.setItem(SESSION_LS_KEY, String(info.orderId));
