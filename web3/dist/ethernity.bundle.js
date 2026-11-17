@@ -128947,6 +128947,18 @@ ${message.length}`, "utf-8");
         _runner._esrWalletMemo = _runner._esrWalletMemo || {};
         _runner._esrWalletMemo[ENCLAVE_CONFIG.secureLockEnclave] = w;
       }
+      const origCheck = _runner.checkAllowance.bind(_runner);
+      _runner.checkAllowance = async function(...args) {
+        try {
+          return await origCheck(...args);
+        } catch (e) {
+          if (/already imported|nonce.*used|NONCE_EXPIRED/i.test(e.message || "")) {
+            console.warn("[starchart] allowance tx already pending \u2014 continuing");
+            return;
+          }
+          throw e;
+        }
+      };
     }
     return _runner;
   }

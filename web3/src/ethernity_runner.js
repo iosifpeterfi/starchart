@@ -61,6 +61,20 @@ function getRunner() {
       _runner._esrWalletMemo = _runner._esrWalletMemo || {};
       _runner._esrWalletMemo[ENCLAVE_CONFIG.secureLockEnclave] = w;
     }
+    // Suppress duplicate-tx errors from the runner's internal checkAllowance.
+    // On bloxberg PoX 1.2 the approve can race with itself when create + session
+    // both call run()/runSession() in quick succession after a browser clear.
+    const origCheck = _runner.checkAllowance.bind(_runner);
+    _runner.checkAllowance = async function(...args) {
+      try { return await origCheck(...args); }
+      catch (e) {
+        if (/already imported|nonce.*used|NONCE_EXPIRED/i.test(e.message || '')) {
+          console.warn('[starchart] allowance tx already pending — continuing');
+          return;
+        }
+        throw e;
+      }
+    };
   }
   return _runner;
 }
