@@ -780,7 +780,8 @@ async function drainQueue(){
           console.warn('drainQueue: nonce violation — resyncing from enclave');
           try {
             var _ri = await signIntent('read_family', {});
-            var _rr = await window.EthernityRunner.submitRead(familyId, _ri, function(){});
+            var _readTimeout1 = new Promise(function(_, rej) { setTimeout(function(){ rej(new Error('resync read timeout')); }, 30000); });
+            var _rr = await Promise.race([window.EthernityRunner.submitRead(familyId, _ri, function(){}), _readTimeout1]);
             if (_rr && _rr.state) {
               familyState = _rr.state;
               if (_rr.version != null) esrVersion = _rr.version;
@@ -899,9 +900,10 @@ async function executeIntent(action, intentData) {
         clearPending(familyId);
         try {
           var _ri = await signIntent('read_family', {});
-          var _rr = await window.EthernityRunner.submitRead(familyId, _ri, function(p){
+          var _readTimeout2 = new Promise(function(_, rej) { setTimeout(function(){ rej(new Error('resync read timeout')); }, 30000); });
+          var _rr = await Promise.race([window.EthernityRunner.submitRead(familyId, _ri, function(p){
             progressFromMessage(p && p.message ? p.message : String(p));
-          });
+          }), _readTimeout2]);
           if (_rr && _rr.state) {
             familyState = _rr.state;
             if (_rr.version != null) esrVersion = _rr.version;
