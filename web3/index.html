@@ -723,6 +723,7 @@ async function ensureSession(){
     console.log('[session] opening interactive session...');
     var info = await window.EthernityRunner.startSession(function(p) {
       var msg = p && p.message ? p.message : String(p);
+      console.log('[session]', msg);
       showToast(msg.length > 50 ? msg.slice(0, 47) + '…' : msg);
     });
     showToast('Session ready');
