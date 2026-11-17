@@ -719,8 +719,13 @@ async function ensureSession(){
   /* Open a new session */
   try {
     setSyncDot('yellow spin');
+    showToast('Opening secure session…');
     console.log('[session] opening interactive session...');
-    var info = await window.EthernityRunner.startSession();
+    var info = await window.EthernityRunner.startSession(function(p) {
+      var msg = p && p.message ? p.message : String(p);
+      showToast(msg.length > 50 ? msg.slice(0, 47) + '…' : msg);
+    });
+    showToast('Session ready');
     console.log('[session] opened, order', info.orderId);
     if (info.orderId) localStorage.setItem(SESSION_LS_KEY, String(info.orderId));
     return true;
